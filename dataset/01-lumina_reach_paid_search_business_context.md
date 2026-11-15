@@ -16,8 +16,9 @@ capability into four tiers:
 
 The network runs paid search for **80 advertiser brands** in 10 industries:
 Retail, Travel, Financial Services, Healthcare, Auto, Insurance, B2B SaaS,
-Education, Real Estate and Restaurants. About 80% of the advertisers are
-managed by a member agency. The other 20% run their search in-house but still
+Education, Real Estate and Restaurants. About three quarters of the
+advertisers (58 of 80) have an active engagement with a member agency. The
+others run their search in-house, or their engagement has ended, but they still
 report through the group's platform; these are called **self-managed**.
 
 The **Central Analytics Office (CAO)**, about ten analysts reporting to the
@@ -41,8 +42,8 @@ The group earns an **agency fee on managed spend**:
 
 So revenue depends on two things:
 
-1. **How much spend the network manages.** Tens of millions of dollars a month
-   across Google Ads and Microsoft Advertising.
+1. **How much spend the network manages.** About $20 million a month across
+   Google Ads and Microsoft Advertising.
 2. **How well it manages it.** Lower CPA and higher ROAS keep clients renewing
    and growing.
 

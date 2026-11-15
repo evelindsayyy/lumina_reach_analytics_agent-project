@@ -81,7 +81,7 @@ ORDER BY active_clients DESC
 ### Q17. Top advertisers by spend, with their managing agency
 
 **Business context:** which brands carry the network, and who manages them.
-About 20% of advertisers manage themselves, so their agency is empty.
+About a quarter of advertisers have no active agency, so their agency is empty.
 **Difficulty:** medium (`LEFT JOIN`s keep self-managed advertisers).
 
 ```sql

@@ -335,7 +335,7 @@ Performance of one search term in one ad group on one day (the SEARCH TERM sourc
 ## 4. Relationships and join rules
 
 - **Advertiser hierarchy:** `advertiser` → `engine_account` → `campaign` → `ad_group` → `keyword` / `text_ad`. Spend reaches an advertiser through `daily_stats.campaign_id` → `campaign.engine_account_id` → `engine_account.advertiser_id`.
-- **Agency relationship:** `agency_client` is the bridge from `agency` to `advertiser`. Portfolio questions use only current engagements (`is_active = 1`). About 20% of advertisers have no agency and are self-managed, so join with `LEFT JOIN`.
+- **Agency relationship:** `agency_client` is the bridge from `agency` to `advertiser`. Portfolio questions use only current engagements (`is_active = 1`). About a quarter of advertisers have no active engagement and are self-managed, so join with `LEFT JOIN`.
 - **Budgets are versioned:** `campaign_budget` holds several versions per campaign. For a day `d`, the budget is the version with the latest `effective_date <= d` (a correlated subquery with `ORDER BY effective_date DESC LIMIT 1`). A plain join counts every version.
 - **Grain of `daily_stats`:** campaign × device × day. Counting campaigns or advertisers over it needs `COUNT(DISTINCT ...)`. Comparing spend to a daily budget needs it summed to campaign × day first.
 - **Broad-match overflow:** `search_term_report.keyword_id` is NULL when a broad-match term matched no keyword of the ad group. Keep those rows with `LEFT JOIN keyword`.
