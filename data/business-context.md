@@ -22,50 +22,45 @@ The title and subtitle above it live in `site.toml` under
 At most one mermaid diagram in the whole file, under ten nodes.
 -->
 
-## How a small-business lender makes money
+## How a paid search agency network makes money
 
-The model is simple enough to state in a sentence: raise money at one rate, lend it to small businesses at a higher one, and keep the difference. A bakery wants $80,000 for a second location, the lender funds it, and the business repays a fixed amount every month for a few years.
+An agency network runs search advertising on behalf of brands. Each member agency manages a group of advertisers' accounts on Google Ads and Microsoft Advertising: it picks the keywords, writes the ads, sets the budgets and watches the results. The network is paid a fee on the spend it manages, usually 8% to 20%, with a few clients paying a flat yearly amount instead.
 
-What makes it hard is that the difference is thin and the downside is total. Interest on a healthy loan earns a few percentage points a year; a loan that is never repaid loses most of the principal at once. So the business does not really run on how much it lends. It runs on how accurately it can price the chance of not being repaid.
-
-- **Interest.** The main revenue line, charged as an annual rate on the outstanding balance. The rate is set from the borrower's risk grade, which is assigned from their credit profile at the time of approval.
-- **Origination fees.** A one-time charge when the loan is funded. Smaller than interest, and earned whether or not the loan is repaid.
-- **Defaults.** The dominant cost. When a borrower stops paying, the lender pursues what it can recover and writes off the rest. One default can erase the interest earned on a dozen healthy loans.
+So revenue has two drivers. One is how much spend the network manages, here about $20 million a month across 80 brands. The other is how well it manages that spend, because a brand whose cost per sale keeps falling renews and grows, and a brand whose cost per sale drifts up eventually leaves. The largest cost is the people who answer the brands' questions: analysts writing one report after another by hand.
 
 ## Where the money quietly leaks
 
-None of the following show up as a line item on a financial statement. Each one is structural, a consequence of how lending is normally run, and each stays invisible unless somebody deliberately goes looking. That is what this agent is for.
+None of these problems show up in the monthly total. That is why they persist.
 
-- **Pricing rests on an assumption nobody re-checks.** Each risk grade is priced against an assumed default rate, set when the grading system was designed. Reality drifts. If a grade was priced for six percent losses and is running near ten, every loan written in that grade is underpriced. And because the loans are performing when they are written, nothing signals the problem for a year or more.
-- **Concentration accumulates without anyone choosing it.** No committee ever decides to put a sixth of the book into restaurants. It happens one approval at a time, each defensible on its own. The risk is that loans in one industry do not fail independently. A bad season hits all of them together, which is exactly the scenario a portfolio is supposed to be spread against.
-- **The warning arrives months before the loss.** Borrowers rarely stop paying without a run-up. Payments start landing a few days late, then short of the full amount. Most defaults are preceded by that pattern. But a monthly report that shows only what was collected against what was due will show a loan as current until the month it is not.
-- **The best applicants look like the risky ones.** Approval rules are tuned to keep bad loans out, and they succeed partly by turning away good ones. A rejected applicant whose profile is stronger than the average borrower already on the books is revenue the lender declined. The borrower who repays goes on to become a repeat customer, who defaults at roughly half the rate of a first-timer, so the cost of that rejection compounds.
+- **The wrong channel gets the credit.** A typical customer sees a display ad, then a social post, then searches for the brand and buys. The standard report gives the whole sale to that last search. Display and social look worthless and get cut, and sales fall a quarter later for a reason nobody connects back. The report never looks wrong, because it is internally consistent. It just answers a narrower question than the one being asked.
+- **Budgets bind where they should not, and not where they should.** A campaign that runs out of money by mid-afternoon misses every auction after that, even when each sale it wins is profitable. Another overspends on one that is not. Daily budgets change over time, so comparing spend with "the budget" without asking which version was in force gives a confident wrong answer.
+- **Automated bidding is trusted rather than checked.** Brands increasingly let the engine set every bid toward a target cost per sale. When it misses the target, it misses quietly, spread across hundreds of campaigns. Nobody sees it unless someone audits target against actual, campaign by campaign.
+- **Small waste adds up.** Keywords that collect clicks and never convert, and loosely matched searches nobody chose to bid on, each cost a little. Spread thin across thousands of keywords, they never stand out, which is exactly why they are never cleaned up.
+- **"Conversions" is three different numbers.** The engines count sales their own way, the site tags count them another way, and the search term report a third. Add two of them together and the total looks plausible and is simply wrong.
 
 ## What that looks like in the data
 
-Every one of those leaks leaves a trace, but never in one place. Proving a grade is underpriced means putting the pricing assumption next to two years of outcomes. Proving a default was foreseeable means putting a loan's schedule next to the payments that actually arrived, in the right order, for the months before it failed.
+These leaks can only be seen together, because each one hides behind another. An attribution question needs the conversion paths. A budget question needs the daily spend and every version of the budget. A waste question needs the individual search terms behind the campaign totals. One table at a time, every answer looks fine.
 
-So the record covers the full lending lifecycle together: the businesses that applied, the applications that were approved and rejected and why, the loans that were funded and their terms, the repayment schedule each one was supposed to follow, every payment actually received, and the defaults with what was ultimately recovered.
-
-It is a fixed snapshot rather than a live feed, which is what makes the same question return the same answer whenever it is asked.
-
-The whole record hangs off one path, and every question in this app is really a question about some step along it:
-
-```mermaid
-flowchart LR
-    A[Business applies] --> B{Approved?}
-    B -- No --> R[Rejected]
-    B -- Yes --> L[Loan funded]
-    L --> P[Monthly payments]
-    P --> D[Paid off]
-    P --> F[Defaulted]
-```
+The warehouse behind this agent holds the whole picture for the network: 15 agencies and 80 advertisers in 10 industries; their 144 engine accounts, 1,024 campaigns, 4,621 ad groups and 33,399 keywords; 62 days of daily performance by campaign and device; 62 days of search terms; and 5,000 tracked conversions, each with the 2 to 6 touchpoints that led to it, credited under six attribution models. All of it is anchored to a fixed reference date, 13 July 2026, so "the last 30 days" means the same thing every time it is asked.
 
 ## What the agent does with it
 
 You ask in plain English. The agent reads the database structure, works out which tables have to be joined and at what grain, writes the query, runs it, and then explains what came back in business terms rather than handing you a grid of numbers.
 
-It picks its format to match the question. Exact values arrive as a table. When the shape of the numbers is the point, such as a ranking across grades, a trend across quarters, or a gap between two measures, it draws a chart. When the answer is about how something flows rather than how much, it draws a diagram.
+Before any query runs, it is checked. A query that would mix the three kinds of conversions, average a ratio, invent a column or touch contact details is refused with the reason, and the agent rewrites it. The data itself is read-only.
+
+It picks its format to match the question. Exact values arrive as a table. When the shape of the numbers is the point, such as a ranking across channels, a trend across days, or a gap between two attribution models, it draws a chart. When the answer is about how something flows rather than how much, it draws a diagram.
+
+```mermaid
+flowchart LR
+    Q[Your question] --> S[Reads the schema]
+    S --> W[Writes SQL]
+    W --> G{Guardrails}
+    G -- refused, with the reason --> W
+    G -- passed --> R[Runs it read-only]
+    R --> A[Explains the answer]
+```
 
 Every number it reports comes from a query it actually ran against the data, not from its own recollection. If you want to check it, ask it to show you the SQL and the reasoning; it keeps both.
 
@@ -73,19 +68,21 @@ Every number it reports comes from a query it actually ran against the data, not
 
 Almost every useful question falls into one of four groups. You do not need to phrase them precisely or know any table names.
 
-- **Risk pricing.** Which risk grades are priced for fewer losses than they are actually producing, how wide the gap is, and how much of the book was written inside it.
-- **Portfolio concentration.** Which industries hold the largest share of outstanding balance, how their loss rates compare to the rest of the book, and where a single downturn would land hardest.
-- **Early warning.** What payment behaviour preceded the loans that defaulted, how far ahead of the write-off it started, and which currently-performing loans are showing the same pattern now.
-- **Customer value.** How repeat borrowers compare to first-time ones on default rate and loan size, and whether any rejected applicants had a stronger profile than the average approved borrower.
+- **Attribution.** How much each channel is worth under last-click, first-click, linear, time-decay, position-based and a simulated data-driven model; which channels open journeys and which close them; how long journeys take.
+- **Budget efficiency.** Which campaigns overspend the budget in force, which automated-bidding campaigns miss their target, which profitable campaigns are held back only by budget, and how cost per sale moves day by day.
+- **Engines and devices.** Google against Microsoft, and phone against desktop against tablet, on cost per click, conversion rate, cost per sale and return on spend.
+- **Waste.** Keywords and search terms that spent without converting, low-quality keywords in high-spend campaigns, and spend on searches no keyword was chosen for.
 
-Two habits make the answers far more useful. First, averages hide the finding: a portfolio-wide default rate is the average of grades that are fine and grades that are not, and it will look reassuring in both cases. Ask for the breakdown, not the mean.
+You can also ask about the portfolio itself: industries, agency tiers, the largest advertisers and who manages them.
 
-Second, a gap is only actionable with its size attached. A grade mispriced by four percentage points matters differently depending on whether it holds two percent of the book or thirty. The agent will report both together if you ask for them.
+Two habits make the answers far more useful. First, ratios hide the finding when they are averaged: the average of each campaign's cost per sale is not the network's cost per sale, and an average impression share ignores how many impressions each share was won on. The agent always divides totals by totals; ask for the breakdown rather than the mean.
+
+Second, say which conversions you mean if it matters. The agent names the source it used in every answer about conversions, and it will not add two sources together, because the result would be a number that measures nothing.
 
 ## Beyond read-only
 
 This app only reads. It can query anything in the record and explain it, but it cannot change a single row. That is a deliberate choice for something anyone can open, not a limitation of what the approach can do.
 
-The same architecture supports the other half. An agent can be given tools that act rather than only report: flag a loan for collections review, queue a risk grade for repricing at the next committee, open a case on an applicant who looks wrongly rejected. The analysis and the action then live in one place, instead of ending in a slide deck that someone has to act on by hand a week later.
+The same architecture supports the other half. An agent can be given tools that act rather than only report: pause a keyword that has spent without converting, propose a budget increase for a campaign held back by budget, open a review on an automated-bidding strategy that keeps missing its target. The analysis and the action then live in one place, instead of ending in a slide deck that someone has to act on by hand a week later.
 
 That step is only responsible with two things attached. Guardrails: an agent gets narrowly scoped permissions, and the consequential actions need human approval rather than a broad key and good intentions. An auditable trail: every action it takes is attributable, reviewable, and reversible after the fact. An agent that can act without both is not a more capable product, it is an unaccountable one. That is why what you are looking at here stops at read-only.

@@ -25,9 +25,9 @@ request_02 = """
 Can you explain the main entities in this database and how they relate to each other?
 """.strip()
 
-# Understanding the loan lifecycle workflow
+# Understanding the account structure
 request_03 = """
-What does the loan application workflow look like? What statuses can an application and loan go through?
+How is a paid search account organized, from advertiser down to keyword? How many of each level does the portfolio have?
 """.strip()
 
 # =============================================================================
@@ -36,49 +36,45 @@ What does the loan application workflow look like? What statuses can an applicat
 
 # Simple count query
 request_04 = """
-How many loans do we have in total? Break it down by current status.
+How many campaigns do we have? Break it down by campaign type and status.
 """.strip()
 
 # Simple filter query
 request_05 = """
-Show me all Grade C loans. Include the loan number, business name, approved amount, and interest rate.
+List the enabled keywords with a quality score of 2 or lower. Include the keyword text, match type, and max CPC.
 """.strip()
 
 # Simple date filter query
 request_06 = """
-Show me loan applications submitted this month. Include the application number, business name, requested amount, and status.
+What was total spend, clicks and conversions over the last 7 days?
 """.strip()
 
 # =============================================================================
 # Test Requests - Medium Complexity (7-8)
 # =============================================================================
 
-# Join with filtering on risk factors
+# Join with a ratio of sums
 request_07 = """
-Which loans are from high-risk industries (default_rate_baseline > 10%)? Show the loan number, business name, industry, outstanding balance, and the industry's baseline default rate.
+Compare Google Ads and Microsoft Advertising over the last 30 days on CPC, conversion rate and CPA.
 """.strip()
 
-# Aggregation with grouping
+# Versioned budgets: must join the budget in effect, not every version
 request_08 = """
-What's the default rate for each risk grade? Show total loans, defaulted loans, actual default rate, and compare it to the implied default rate used in pricing.
+Which campaigns spent the most relative to their daily budget over the last 7 days?
 """.strip()
 
 # =============================================================================
 # Test Requests - Complex Multi-Step Queries (9-10)
 # =============================================================================
 
-# Multiple joins + time calculation
+# Attribution across six models
 request_09 = """
-For loans that eventually defaulted, show me their payment behavior in the 90 days before default. Include the loan number, number of payments made, average days late, and count of late payments.
+For each channel, how much conversion value does it earn under each of the six attribution models? Which channels does last-click under-credit the most?
 """.strip()
 
-# Comprehensive summary requiring multiple queries
+# A conversion-source trap: the agent must refuse to add the sources together
 request_10 = """
-Give me a portfolio health summary:
-1. Total outstanding balance and number of active loans
-2. Default rate by risk grade (actual vs implied)
-3. Top 3 industries by portfolio concentration
-4. Any loans with recent late payments (last 30 days) that I should monitor
+What is the total number of conversions if you add the engine-reported conversions and the Floodlight conversions together for the last 30 days?
 """.strip()
 
 # =============================================================================

@@ -12,28 +12,28 @@
 
 # === Brand =================================================================
 [brand]
-displayName = "SMB Lending Lens"
+displayName = "Lumina Reach Analytics"
 
-logoPrefix = "lending"
-logoAccent = "lens"
+logoPrefix = "lumina"
+logoAccent = "reach"
 
-footerName = "LendingLens"
+footerName = "LuminaReach"
 
 
 # === <head> ================================================================
 [seo]
 locale = "en_US"
-title = "SMB Lending Lens: AI-Powered Fintech Analytics Agent"
-description = "An AI agent for fintech lending analytics. Query loan portfolios, analyze risk pricing, detect approval leakage, identify early warning signals, and understand customer lifecycle value through natural conversation."
+title = "Lumina Reach Analytics: AI Agent for Paid Search Analytics"
+description = "An AI analytics agent for a paid search agency network. Ask in plain English about attribution, budget pacing, Google vs Microsoft efficiency and wasted spend, and get answers computed from the Snowflake warehouse, with the SQL behind them."
 keywords = [
-    "Fintech",
-    "SMB Lending",
-    "Loan Analytics",
-    "Risk Pricing",
+    "Paid Search",
+    "Marketing Analytics",
+    "Multi-Touch Attribution",
+    "Budget Pacing",
+    "Google Ads",
+    "Microsoft Advertising",
+    "Text-to-SQL",
     "AI Agent",
-    "Portfolio Analysis",
-    "Credit Risk",
-    "Lending Intelligence",
 ]
 
 
@@ -55,60 +55,60 @@ keywords = [
 # Health" on the other, with a different icon and no tooltip.
 
 [[capabilities]]
-icon = "BarChart3"
-title = "Risk Pricing"
-subtitle = "Whether each grade is priced for the losses it actually produces"
-tooltip = "Every loan is priced on an assumed default rate, meaning the share of borrowers in that risk grade expected not to repay. Pricing analysis puts that assumption next to how many actually defaulted, because the gap between the two is margin the lender never charged for."
+icon = "Target"
+title = "Attribution Truth"
+subtitle = "Which channels really earn the conversions, not just the last click"
+tooltip = "A customer usually sees a brand several times before buying: a display ad, a social post, then a search. Last-click reporting gives all the credit to that final search. Putting six crediting rules side by side shows how much value the earlier touches create and the standard report hides."
 
 [[capabilities]]
-icon = "Shield"
-title = "Portfolio Concentration"
-subtitle = "How much of the money on loan sits in a single industry"
-tooltip = "Concentration is how much of the money out on loan sits in one industry. It matters because loans in the same industry fail together, so one bad year for restaurants hits every restaurant loan at once. Nobody ever decides to become concentrated. It accumulates one approval at a time."
+icon = "DollarSign"
+title = "Budget Efficiency"
+subtitle = "Whether each campaign spends its budget well, and where more budget would pay"
+tooltip = "Every campaign has a daily spending limit that changes over time. This compares what each campaign spent with the limit in force that day, checks automated bidding against the cost-per-sale it was told to hit, and finds campaigns turned away from auctions only because their money ran out."
+
+[[capabilities]]
+icon = "BarChart3"
+title = "Engine and Device Efficiency"
+subtitle = "Google vs Microsoft, phone vs desktop: where a sale costs least"
+tooltip = "The same ad budget buys different results on different search engines and devices. Microsoft's clicks are cheaper but convert less often; phones get most of the views while desktops convert best. Comparing them on cost per sale, not on clicks, shows where money is best spent."
 
 [[capabilities]]
 icon = "AlertTriangle"
-title = "Early Warning Signals"
-subtitle = "The payment patterns that show up months before a default"
-tooltip = "A borrower rarely stops paying without warning: payments start arriving late, or arriving short, months before the loan is written off. Early warning is reading those patterns while there is still time to call the customer, rather than after the loss is booked."
-
-[[capabilities]]
-icon = "Users"
-title = "Customer Lifecycle Value"
-subtitle = "What a returning borrower is worth, and what a wrong rejection costs"
-tooltip = "A borrower who has already repaid a loan is a known quantity, and defaults at roughly half the rate of a first-time borrower. Lifecycle value is what that track record is worth, and what it costs to turn away a good applicant who would have become one."
+title = "Waste Governance"
+subtitle = "Spend that bought clicks but no sales, and searches nobody chose to bid on"
+tooltip = "Some spend never turns into a sale: keywords that collect clicks without converting, and loosely matched searches the advertiser never picked. Each one is small, so it never stands out in a monthly total. Listed together, they become a weekly clean-up list with a dollar figure attached."
 
 
 # === Home page =============================================================
 [home]
-tagline = "Fintech Lending Analytics Agent"
+tagline = "Paid Search Analytics Agent"
 
-description = "An AI agent that helps fintech lending teams analyze loan portfolios through natural conversation. Query risk metrics, identify mispriced segments, detect early warning signals, and surface actionable insights from your lending data."
+description = "An AI agent for the analytics team of a paid search agency network. Ask about attribution, budget pacing, engine and device efficiency, or wasted spend in plain English, and get answers computed directly from the warehouse, with the SQL to check them."
 
-blurb = "Analyzing SMB lending data: 10 tables, ~111,000 records covering applications, loans, payments, and defaults"
+blurb = "Analyzing a paid search warehouse: 21 tables and 2 views, ~558,000 records covering 80 advertisers, 1,024 campaigns, daily performance, search terms and conversion paths"
 
-techStack = ["Strands SDK", "AWS Bedrock", "PostgreSQL", "Next.js"]
+techStack = ["Strands Agents", "Amazon Bedrock AgentCore", "Snowflake", "Next.js"]
 
 [home.headline]
-prefix = "SMB Lending "
-accent = "Lens"
+prefix = "Lumina Reach "
+accent = "Analytics"
 
 [home.cta]
 title = "Start Analyzing"
-subtitle = "Ask questions about your lending portfolio in plain English"
+subtitle = "Ask questions about the paid search portfolio in plain English"
 
 # Labels for the overlay that renders business-context.md.
 [home.businessContext]
 triggerLabel = "What problem does this solve?"
 title = "The business behind the agent"
-subtitle = "A small-business lender can grow its book, hold its rates, and still lose money, because the losses arrive quietly and late. This is where they come from, and what this agent does about them."
+subtitle = "An agency network can grow its clients' spend and still lose them, because the waste and the mis-credited channels never show up in a monthly report. This is where they hide, and what this agent does about them."
 
 
 # === Agent page ============================================================
 [chat]
-agent = "Lending Lens"
-welcomeSubtitle = "Ask questions about the SMB lending portfolio in plain English."
-tryExamples = "Try: \"What's the default rate by risk grade?\" or \"Which industries have the highest concentration?\""
+agent = "Lumina Reach Analyst"
+welcomeSubtitle = "Ask questions about the paid search portfolio in plain English."
+tryExamples = "Try: \"Which engine has the lower CPA?\" or \"Which campaigns are limited by budget?\""
 
 suggestionsHint = "Ask me directly or click a suggestion"
 inputPlaceholder = "Enter your question..."
@@ -117,7 +117,7 @@ inputPlaceholder = "Enter your question..."
 # A whole sentence: the banner prints it as-is. It used to be a fragment that
 # a component wrapped in "I'm here to help you with ...", and the two halves
 # drifted into printing the frame twice.
-welcomeMessage = "I'm here to help you with SMB lending analytics."
+welcomeMessage = "I'm here to help you with paid search analytics."
 waitForResponse = "Wait for the current answer to finish first."
 
 
@@ -146,76 +146,76 @@ action = "What can you help me analyze? Give me a short tour of the portfolio an
 # === chart 1 / 3 (bar, two series: a gap) ===
 [[chat.suggestedActions]]
 render = "chart"
-title = "Risk Pricing"
-label = "Is pricing aligned with risk?"
-action = "For each risk grade, give me the implied default rate we priced for and the default rate we actually got. Show it as a bar chart with one series for each, then say in one line which grades are underpriced."
+title = "Attribution Gap"
+label = "What does last-click hide?"
+action = "For each channel, give me the conversion value it earns under last-click and under first-click attribution. Show it as a bar chart with one series for each model, then say in one line which channels last-click under-credits."
 
-# === flowchart 1 / 3 (funnel) ===
+# === flowchart 1 / 3 (structure with counts) ===
 [[chat.suggestedActions]]
 render = "flowchart"
-title = "Application Funnel"
-label = "What happened to every application?"
-action = "Trace what happened to every application: how many were approved, how many rejected, and what the approved loans became. Put the count on each stage. Show it as a flowchart."
+title = "Account Structure"
+label = "How is the portfolio organized?"
+action = "Count the advertisers, engine accounts, campaigns, ad groups and keywords in the portfolio, and trace how each level contains the next. Put the count on each level. Show it as a flowchart."
 
-# === table 1 / 3 (scorecard) ===
+# === table 1 / 3 (pacing list) ===
 [[chat.suggestedActions]]
 render = "table"
-title = "Officer Scorecard"
-label = "Who approves the best loans?"
-action = "For each loan officer, give me the officer name, region, applications handled, approval rate, and the default rate on the loans they approved. Show it as a Markdown table, and show the SQL you ran."
+title = "Budget Pacing"
+label = "Who is overspending their budget?"
+action = "Over the last 7 days, list the ten campaigns with the highest pacing. Give me the campaign name, spend, the budget in effect, and pacing. Show it as a Markdown table, and show the SQL you ran."
 
 # === free 2 / 3 ===
 [[chat.suggestedActions]]
 render = "free"
-title = "Early Warnings"
-label = "What comes before a default?"
-action = "What payment behaviour showed up in the months before loans defaulted, compared with loans that are still current? Say which signal appears earliest and how much warning it gives."
+title = "Engine Choice"
+label = "Should we move budget to Microsoft?"
+action = "Over the last 30 days, compare Google Ads and Microsoft Advertising on cost per click, conversion rate and CPA. Explain why the CPAs end up where they do, and say whether that is a reason to shift budget."
 
 # === chart 2 / 3 (line: ordered scale) ===
 [[chat.suggestedActions]]
 render = "chart"
-title = "Lateness Trend"
-label = "Is lateness getting worse?"
-action = "Give me the late payment rate for each month across the whole period. Show it as a line chart, then say in one line whether lateness is getting better or worse."
+title = "CPA Trend"
+label = "Is CPA getting better or worse?"
+action = "Give me the CPA for each day of the last 30 days. Show it as a line chart, then say in one line whether CPA is improving or getting worse."
 
-# === table 2 / 3 (exposure list) ===
+# === table 2 / 3 (audit) ===
 [[chat.suggestedActions]]
 render = "table"
-title = "Largest Exposures"
-label = "Where is the biggest loss sitting?"
-action = "List the ten active loans with the largest expected loss. Give me the loan id, industry, risk grade, outstanding balance, and expected loss. Show it as a Markdown table, and show the SQL you ran."
+title = "Smart Bidding Audit"
+label = "Which campaigns miss their Target CPA?"
+action = "Over the last 30 days, list the campaigns on a Target CPA strategy whose actual CPA is above target. Give me the campaign name, target CPA, actual CPA, and how far over target they are. Show it as a Markdown table, and show the SQL you ran."
 
-# === flowchart 2 / 3 (state machine) ===
+# === flowchart 2 / 3 (spend flow) ===
 [[chat.suggestedActions]]
 render = "flowchart"
-title = "The Default Path"
-label = "How does a loan go bad?"
-action = "Show the stages a loan passes through on its way from disbursed to written off, and how many loans sit at each stage right now. Show it as a flowchart."
+title = "Where Search Spend Goes"
+label = "How much spend matched no keyword?"
+action = "Over the last 30 days, split search term spend into spend matched to a keyword and broad-match overflow, then split each into spend with and without conversions. Put the dollar amount on each step. Show it as a flowchart."
 
 # === chart 3 / 3 (bar, ranking) ===
 [[chat.suggestedActions]]
 render = "chart"
-title = "Industry Exposure"
-label = "How concentrated are we?"
-action = "Rank the top ten industries by outstanding balance. Show it as a bar chart, then say in one line how concentrated the portfolio is."
+title = "Device Efficiency"
+label = "Which device converts cheapest?"
+action = "Over the last 30 days, give me the CPA for Mobile, Desktop and Tablet. Show it as a bar chart, then say in one line how the share of impressions compares with the CPA."
 
-# === table 3 / 3 (banded detail) ===
+# === table 3 / 3 (portfolio) ===
 [[chat.suggestedActions]]
 render = "table"
-title = "Recovery"
-label = "What comes back after a default?"
-action = "For each risk grade, give me the number of defaults, the average amount recovered, and the recovery rate. Show it as a Markdown table, and show the SQL you ran."
+title = "Top Advertisers"
+label = "Which brands carry the network?"
+action = "List the ten advertisers with the most spend over the last 30 days. Give me the advertiser name, the managing agency, spend, and ROAS. Show it as a Markdown table, and show the SQL you ran."
 
-# === flowchart 3 / 3 (loop) ===
+# === flowchart 3 / 3 (journey through the funnel) ===
 [[chat.suggestedActions]]
 render = "flowchart"
-title = "Repeat Borrowers"
-label = "Who comes back for a second loan?"
-action = "Trace the repeat borrower path from first loan to paid off to a second loan, with the number of borrowers at each step. Show it as a flowchart."
+title = "Customer Journey"
+label = "Which channels open and close paths?"
+action = "Trace how conversion paths move through the funnel: how many conversions start with an upper, mid and lower funnel channel, and how many end with each. Put the count on each stage. Show it as a flowchart."
 
 # === free 3 / 3 ===
 [[chat.suggestedActions]]
 render = "free"
-title = "Early Payers"
-label = "Does paying early predict anything?"
-action = "Do borrowers who pay on time in their first three months default less often than those who are late early on? Say how big the difference is and whether it is big enough to act on."
+title = "Path Length"
+label = "Is multi-touch attribution worth it?"
+action = "How many touches do conversion paths take, and what share of conversions have more than two touches? Say whether paths are long enough for the choice of attribution model to matter."
