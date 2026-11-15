@@ -137,7 +137,12 @@ env = { AGENT_APP_DEV_SERVER = "{{config_root}}" }
 # taken, but next.config.js rewrites /api to a hardcoded 127.0.0.1:8000, so the
 # hopped-to frontend silently talks to whichever backend owns 8000 -- possibly
 # another checkout's. Failing to start is the better outcome.
-run = "next dev --port 3000"
+#
+# --webpack because Turbopack's dev server cannot resolve next/font/google URLs
+# that carry more than one query parameter ("next/font/google queries have
+# exactly one entry"), which the Figtree font in app/layout.tsx does. The
+# production build is unaffected and stays on Turbopack.
+run = "next dev --webpack --port 3000"
 
 [tasks.fastapi-dev]
 description = "⚙️ Start FastAPI development server"

@@ -16,6 +16,7 @@ Key components:
 import os
 import sys
 import io
+import logging
 
 # fmt: off
 from fastapi import FastAPI, Request, Query
@@ -27,10 +28,13 @@ from agent_app.ai_sdk_adapter import get_last_user_message_text
 from agent_app.ai_sdk_adapter import read_request_body
 from agent_app.ai_sdk_adapter import request_body_to_agent_history
 from agent_app.one.api import one  # Main singleton with agent
+from agent_app.agent_response import agent_error_message
 from agent_app.agent_response import parse_agent_response
 from agent_app.quota import check_quota
 from agent_app.quota import increment_usage
 from agent_app.quota import QuotaExceededError
+
+logger = logging.getLogger(__name__)
 # fmt: on
 
 # Add project root to sys.path for module imports
@@ -125,6 +129,11 @@ async def handle_chat_data(request: Request, protocol: str = Query("data")):
     sys.stdout = io.StringIO()
     try:
         agent_result = agent(last_user_message)
+    except Exception as e:
+        # Throttling, provider outages, a tool that raised: log the details for
+        # the operator and give the reader a sentence instead of a bare 500.
+        logger.exception("[Agent] turn failed")
+        return ai_sdk_streaming_response(agent_error_message(e))
     finally:
         sys.stdout = old_stdout
 

@@ -1,5 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Pin the workspace root to this repo. Without it, Turbopack picks the
+  // directory of any lockfile it finds further up (a stray ~/package-lock.json
+  // is enough), and next/font then fails to resolve in `next dev`.
+  turbopack: {
+    root: __dirname,
+  },
+
   // Performance optimizations
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production', // Remove console.log in production

@@ -137,6 +137,21 @@ class TestNormalizeRenderBlocks:
         text = "One group accounts for 40% of the problem records."
         assert normalize_render_blocks(text) == text
 
+class TestAgentErrorMessage:
+    def test_throttling_says_try_later(self):
+        from strands.types.exceptions import ModelThrottledException
+
+        from agent_app.agent_response import MODEL_THROTTLED_MESSAGE, agent_error_message
+
+        assert agent_error_message(ModelThrottledException("Too many tokens per day")) == MODEL_THROTTLED_MESSAGE
+
+    def test_anything_else_hides_the_details(self):
+        from agent_app.agent_response import MODEL_FAILED_MESSAGE, agent_error_message
+
+        message = agent_error_message(RuntimeError("secret internal detail"))
+        assert message == MODEL_FAILED_MESSAGE
+        assert "secret" not in message
+
 
 if __name__ == "__main__":
     from agent_app.tests import run_cov_test

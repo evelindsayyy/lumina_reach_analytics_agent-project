@@ -115,3 +115,33 @@ def parse_agent_response(
         extract_text_from_messages(messages, start_index)
     )
     return thinking, normalize_render_blocks(answer)
+
+
+#: Shown when the model provider refuses for capacity reasons (a rate or daily
+#: token limit). Retrying later can work, so the message says so.
+MODEL_THROTTLED_MESSAGE = (
+    "The language model is over its usage limit right now, so I could not "
+    "answer. Please try again later. If this keeps happening, the deployment "
+    "needs a higher model quota or a different LLM_PROVIDER."
+)
+
+#: Shown for any other failure inside the agent turn. The details go to the
+#: server log, not to the reader.
+MODEL_FAILED_MESSAGE = (
+    "Something went wrong while I was working on this, so I could not answer. "
+    "Please try again; if it keeps failing, the server log has the details."
+)
+
+
+def agent_error_message(error: Exception) -> str:
+    """
+    The sentence to show the user when an agent turn raises.
+
+    A turn that raises would otherwise reach the browser as a bare HTTP 500,
+    which the chat UI renders as a broken turn with no explanation.
+    """
+    from strands.types.exceptions import ModelThrottledException
+
+    if isinstance(error, ModelThrottledException):
+        return MODEL_THROTTLED_MESSAGE
+    return MODEL_FAILED_MESSAGE
