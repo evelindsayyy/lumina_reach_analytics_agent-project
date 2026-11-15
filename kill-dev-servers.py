@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
 """
-Kill this project's Next.js and FastAPI development servers -- and nothing else.
+Kill this project's development servers (Next.js, the agent runtime, the MCP
+runtime) -- and nothing else.
 
 Usage:
     python kill-dev-servers.py [--dry-run] [--force]
@@ -50,23 +51,22 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 DEV_MARKER_VAR = "AGENT_APP_DEV_SERVER"
 DEV_MARKER = f"{DEV_MARKER_VAR}={PROJECT_ROOT}"
 
-# Only the ports this repo actually serves on: 3000 for `next dev` and 8000 for
-# uvicorn. Next.js is pinned to 3000 in mise.toml rather than left to drift to
-# 3001 when 3000 is taken, because next.config.js rewrites /api to a hardcoded
-# 127.0.0.1:8000 -- a frontend that quietly moved to 3001 would keep talking to
-# whatever backend owns 8000, which may belong to another checkout entirely.
-# Pinning turns that silent mis-wiring into a startup error. It also keeps this
-# list short: an unrelated app on 3001 is none of our business.
-DEV_PORTS = (3000, 8000)
+# Only the ports this repo actually serves on: 3000 for `next dev`, 8080 for
+# the agent runtime and 8000 for the MCP runtime (the ports AgentCore Runtime
+# itself uses). Next.js is pinned to 3000 in mise.toml rather than left to
+# drift to 3001 when 3000 is taken, so a second frontend cannot quietly share
+# this checkout's runtimes. It also keeps this list short: an unrelated app on
+# 3001 is none of our business.
+DEV_PORTS = (3000, 8000, 8080)
 
 # Patterns that make a process a *candidate*. They are allowed to be loose --
 # the project-ownership check below is what decides. See mise.toml.
 SEED_PATTERNS = [
-    re.compile(r"mise run (next|fastapi)-dev\b"),
+    re.compile(r"mise run (next|agent|mcp)-dev\b"),
     re.compile(r"concurrently.*\bnext-dev\b"),
     re.compile(r"\bnext\b\s+dev\b"),
     re.compile(r"\bnext-server\b"),
-    re.compile(r"\buvicorn\b.*\bapi\.index:app"),
+    re.compile(r"-m agent_app\.runtimes\.analytics_(agent|mcp)\b"),
 ]
 
 # Seconds to wait for a graceful SIGTERM before escalating to SIGKILL.
@@ -340,8 +340,7 @@ def main() -> int:
             foreign.add(pid)
 
     # A verified process brings its whole subtree with it: `next dev` spawns
-    # next-server, which spawns the postcss worker, and uvicorn --reload spawns
-    # the actual app.
+    # next-server, which spawns the postcss worker.
     targets: Set[int] = set()
     for pid in ours:
         targets.add(pid)
@@ -377,8 +376,7 @@ def main() -> int:
     #
     # A qualifying process is then uprooted whole -- up to the top of its dev
     # tree, then everything below that. Killing only the listener would leave
-    # the other checkout's `concurrently` and `mise run` wrappers behind, and
-    # a uvicorn reloader would simply respawn the worker we just killed.
+    # the other checkout's `concurrently` and `mise run` wrappers behind.
     if args.force:
         for pid in foreign & port_holders:
             root = table.tree_root_of(pid, stop_at=protected)
@@ -412,8 +410,8 @@ def main() -> int:
 
     # `mise run dev` depends on this task, so a non-zero exit is what stops it
     # from starting on top of a port it does not own. Without this the servers
-    # come up half-broken: uvicorn dies on "address already in use" while Next
-    # proxies /api to the stranger already sitting on 8000.
+    # come up half-broken: a runtime dies on "address already in use" while
+    # Next forwards chats to the stranger already sitting on its port.
     if blocked:
         print(
             "\n❌ A dev port above is held by a process that is not this"

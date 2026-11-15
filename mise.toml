@@ -91,7 +91,7 @@ run = ".venv/bin/pytest tests_python"
 
 [tasks.test-node]
 description = "🧪 Run Node.js tests"
-run = "node --test tests_node/*.test.js"
+run = "node --test tests_node/*.test.mjs"
 
 # The only thing that reads `data/site.toml` through the frontend's own loader,
 # so it is the only thing that catches a missing required key or an `icon` that
@@ -122,8 +122,8 @@ depends = ["cov-python"]
 
 # Every dev server is stamped with this env var so `mise run kill` can find
 # exactly our processes and nothing else. Children inherit it, so tagging the
-# top of each tree tags next-server, the postcss worker, and the uvicorn
-# reloader for free.
+# top of each tree tags next-server, the postcss worker, and both runtimes for
+# free.
 #
 # The name is generic on purpose and may be shared with other projects grown
 # from this scaffold: what identifies a checkout is the *value*, which is this
@@ -134,9 +134,8 @@ depends = ["cov-python"]
 description = "🌐 Start Next.js development server"
 env = { AGENT_APP_DEV_SERVER = "{{config_root}}" }
 # Pinned to 3000 on purpose. Left to itself Next.js hops to 3001 when 3000 is
-# taken, but next.config.js rewrites /api to a hardcoded 127.0.0.1:8000, so the
-# hopped-to frontend silently talks to whichever backend owns 8000 -- possibly
-# another checkout's. Failing to start is the better outcome.
+# taken, and a second frontend would quietly share this checkout's agent
+# runtime on 8080. Failing to start is the better outcome.
 #
 # --webpack because Turbopack's dev server cannot resolve next/font/google URLs
 # that carry more than one query parameter ("next/font/google queries have
@@ -144,17 +143,27 @@ env = { AGENT_APP_DEV_SERVER = "{{config_root}}" }
 # production build is unaffected and stays on Turbopack.
 run = "next dev --webpack --port 3000"
 
-[tasks.fastapi-dev]
-description = "⚙️ Start FastAPI development server"
-env = { AGENT_APP_DEV_SERVER = "{{config_root}}" }
-run = "uv run -- python -m uvicorn api.index:app --reload --host 127.0.0.1 --port 8000"
+# The two AgentCore runtimes, run locally exactly as they run deployed. The
+# browser talks only to Next.js; app/api/chat/route.ts forwards to the agent
+# on 8080, and the agent reaches its data tools on 8000 over MCP.
+[tasks.agent-dev]
+description = "🤖 Start the agent runtime (AgentCore HTTP contract, port 8080)"
+env = { AGENT_APP_DEV_SERVER = "{{config_root}}", MCP_URL_ANALYTICSMCP = "http://127.0.0.1:8000/mcp" }
+run = ".venv/bin/python -m agent_app.runtimes.analytics_agent"
+
+[tasks.mcp-dev]
+description = "🛠️ Start the MCP tool runtime (AgentCore MCP contract, port 8000)"
+# 127.0.0.1, not the 0.0.0.0 AgentCore needs: a laptop should not serve the
+# warehouse tools to its whole network.
+env = { AGENT_APP_DEV_SERVER = "{{config_root}}", MCP_HOST = "127.0.0.1" }
+run = ".venv/bin/python -m agent_app.runtimes.analytics_mcp"
 
 [tasks.dev]
-description = "🚀 Start all development servers (Next.js + FastAPI)"
+description = "🚀 Start all development servers (Next.js + agent runtime + MCP runtime)"
 depends = ["kill"]
 env = { AGENT_APP_DEV_SERVER = "{{config_root}}" }
-run = "pnpm exec concurrently 'mise run next-dev' 'mise run fastapi-dev'"
+run = "pnpm exec concurrently --names web,agent,mcp 'mise run next-dev' 'mise run agent-dev' 'mise run mcp-dev'"
 
 [tasks.kill]
-description = "🛑 Kill this project's development servers (Next.js + FastAPI)"
+description = "🛑 Kill this project's development servers (Next.js + both runtimes)"
 run = "uv run -- python kill-dev-servers.py"

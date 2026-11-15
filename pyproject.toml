@@ -8,8 +8,9 @@ requires-python = ">=3.12,<4.0"
 dependencies = [
     "func-args>=1.0.2,<2.0.0",      # inspect function/method arguments
     "pydantic>=2.11.10,<3.0.0",     # Data validation and settings management using Python type annotations
-    "fastapi>=0.140.13,<1.0.0",      # Web framework
-    "uvicorn>=0.38.0,<1.0.0",       # ASGI server
+    "bedrock-agentcore>=1.25.2,<2.0.0", # BedrockAgentCoreApp, the agent runtime's HTTP server (AgentCore contract)
+    "mcp>=1.28.1,<2.0.0",           # FastMCP, the tool runtime's server; the agent's MCP client
+    "starlette>=0.46.0,<1.0.0",     # the agent runtime's responses (BedrockAgentCoreApp is a Starlette app)
     "boto3>=1.43.0,<2.0.0",         # AWS SDK for Python
     # NOTE: no typed-wrapper or type-stub package for boto3 here on purpose. They
     # only buy editor autocompletion, and they pin to a boto3 version — when they
@@ -49,8 +50,6 @@ dependencies = [
     "strands-agents-tools>=0.5.3,<1.0.0",  # Strands Agents Tools is a collection of utilities and integrations designed to enhance the functionality of Strands Agents. It includes pre-built tools for common tasks, such as web scraping, database interactions, and API calls, allowing developers to easily incorporate these capabilities into their agents without having to build them from scratch.
     "fire>=0.6.0,<1.0.0",           # Python library for creating command line interfaces (CLIs) from absolutely any Python object
     "python-dotenv>=1.2.1,<2.0.0",  # Read key-value pairs from a .env file and set them as environment variables
-    "bedrock-agentcore>=1.25.2,<2.0.0",
-    "mcp>=1.28.1,<2.0.0",
 ]
 
 [project.optional-dependencies]
