@@ -29,6 +29,35 @@ class TestEngine:
         assert one.database_schema_str.startswith("duckdb Database")
 
 
+class TestSnowflakeSelection:
+    def test_snowflake_engine_is_chosen_by_config(self):
+        """Built, never connected: no account needed."""
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric import rsa
+
+        from agent_app.config import Config
+        from agent_app.one.one_00_main import One
+
+        pem = rsa.generate_private_key(public_exponent=65537, key_size=2048).private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        ).decode()
+        other = One()
+        other.__dict__["config"] = Config(
+            schema_name="acme",
+            warehouse_engine="snowflake",
+            snowflake_account="acme-test",
+            snowflake_user="ACME_SVC",
+            snowflake_role="ACME_READER",
+            snowflake_warehouse="ACME_WH",
+            snowflake_database="ACME",
+            snowflake_private_key_pem=pem,
+        )
+        assert other.engine.dialect.name == "snowflake"
+        assert other.db_type is DbTypeEnum.SNOWFLAKE
+
+
 class TestGuardrailPolicy:
     def test_built_from_reflection_and_the_policy_file(self):
         policy = one.guardrail_policy

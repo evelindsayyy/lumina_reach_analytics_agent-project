@@ -224,6 +224,48 @@ if __name__ == "__main__":
     )
 
 
+class TestWarehouseConfig:
+    def test_duckdb_is_the_default(self):
+        assert Config().warehouse_engine == "duckdb"
+
+    def test_an_unknown_engine_fails_at_start_up(self):
+        with pytest.raises(ValueError, match="WAREHOUSE_ENGINE"):
+            Config(warehouse_engine="postgres")
+
+    def test_the_private_key_never_appears_in_repr(self):
+        assert "BEGIN" not in repr(Config(snowflake_private_key_pem="-----BEGIN PRIVATE KEY-----"))
+
+    def test_key_from_the_env_var_wins(self, monkeypatch, tmp_path):
+        from agent_app.config import read_private_key_pem
+
+        path = tmp_path / "key.pem"
+        path.write_text("from-file", encoding="utf-8")
+        monkeypatch.setenv("SNOWFLAKE_PRIVATE_KEY_PATH", str(path))
+        monkeypatch.setenv("SNOWFLAKE_PRIVATE_KEY", "from-env")
+        assert read_private_key_pem() == "from-env"
+
+    def test_key_from_a_file(self, monkeypatch, tmp_path):
+        from agent_app.config import read_private_key_pem
+
+        path = tmp_path / "key.pem"
+        path.write_text("from-file", encoding="utf-8")
+        monkeypatch.delenv("SNOWFLAKE_PRIVATE_KEY", raising=False)
+        monkeypatch.setenv("SNOWFLAKE_PRIVATE_KEY_PATH", str(path))
+        assert read_private_key_pem() == "from-file"
+
+    def test_a_missing_key_file_is_no_key(self, monkeypatch, tmp_path):
+        """A stale path must not stop a DuckDB-only machine from booting."""
+        from agent_app.config import read_private_key_pem
+
+        monkeypatch.delenv("SNOWFLAKE_PRIVATE_KEY", raising=False)
+        monkeypatch.setenv("SNOWFLAKE_PRIVATE_KEY_PATH", str(tmp_path / "missing.pem"))
+        assert read_private_key_pem() is None
+
+    def test_duckdb_path_override(self, monkeypatch):
+        monkeypatch.setenv("DUCKDB_PATH", "/data/acme_widgets.duckdb")
+        assert str(Config.new_from_env_var().duckdb_path) == "/data/acme_widgets.duckdb"
+
+
 class TestSystemPromptContent:
     """The prompt is a committed file; reading it needs no infrastructure."""
 

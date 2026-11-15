@@ -66,6 +66,33 @@ class TestCheckContent:
         assert exc.value.code == 1
 
 
+class TestGenData:
+    def test_runs_the_single_generator_and_replaces_old_files(self, monkeypatch, tmp_path):
+        import subprocess
+
+        (tmp_path / "04-acme_widgets_data_generator.py").touch()
+        (tmp_path / "old.duckdb").touch()
+        monkeypatch.setattr("agent_app.warehouse.engines.DIR_DATASET", tmp_path)
+        calls = []
+
+        def fake_run(argv, **kwargs):
+            calls.append(argv)
+            return subprocess.CompletedProcess(argv, 0)
+
+        monkeypatch.setattr(subprocess, "run", fake_run)
+        with pytest.raises(SystemExit) as exc:
+            cli.Cli().gen_data(seed=7)
+        assert exc.value.code == 0
+        assert not (tmp_path / "old.duckdb").exists()
+        assert calls[0][-2:] == ["--seed", "7"]
+
+    def test_no_generator_exits_one(self, monkeypatch, tmp_path):
+        monkeypatch.setattr("agent_app.warehouse.engines.DIR_DATASET", tmp_path)
+        with pytest.raises(SystemExit) as exc:
+            cli.Cli().gen_data()
+        assert exc.value.code == 1
+
+
 class TestTestDbConn:
     """
     No network here. What is worth pinning is the exit code on each path, since
