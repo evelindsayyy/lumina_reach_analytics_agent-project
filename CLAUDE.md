@@ -17,13 +17,15 @@ data/                        # EVERY AUTHORED ARTIFACT a dataset swap rewrites.
 ├── site.toml                #   Every sentence the frontend says, incl. the 12
 │                            #   kickstart questions and the 4 capability cards.
 ├── business-context.md      #   The long-form explainer behind the home page.
-└── system-prompt.md         #   The agent's domain brain.
+├── system-prompt.md         #   The agent's domain brain.
+└── sql-policy.toml          #   The dataset's SQL guardrail rules: sensitive
+                             #   columns, share columns, conversion sources.
 
 dataset/                     # The dataset's own source material. Committed --
 ├── 0*-*.md                  #   summary, business context, ER doc, SQL queries
-├── 04-*_data_generator*.py  #   ...but its OUTPUT is not: run the generator to
-├── requirements.txt         #   build <name>.sqlite and data/*.tsv locally.
-└── <name>.sqlite            #   gitignored; discovered by paths.py, not named.
+├── 04-*_data_generator*.py  #   ...but its OUTPUT is not: `mise run gen-data`
+├── requirements.txt         #   builds <name>.duckdb locally (duckdb only).
+└── <name>.duckdb            #   gitignored; discovered by warehouse/engines.py.
 
 agent_app/                   # Python package. Name is deliberately generic and
 ├── api.py                   #   never changes when the dataset changes.
@@ -35,10 +37,13 @@ agent_app/                   # Python package. Name is deliberately generic and
 │
 ├── config.py                # Reads .env + .env.defaults. Nothing else parses
 │                            #   configuration; data/ holds content only.
-├── dataset.py               # TEACHING LAYER, meant to be deleted. Discovers
-│                            #   dataset/*.sqlite and its generator, runs the
-│                            #   generator, syncs to PostgreSQL. Nothing on the
-│                            #   production path imports it.
+├── cli.py                   # `agent-app` console script (incl. gen-data).
+├── content_check.py         # `agent-app check-content`.
+├── warehouse/
+│   ├── engines.py           #   DuckDB / Snowflake engines; finds the .duckdb file
+│   └── dialect.py           #   Snowflake -> DuckDB transpile (sqlglot)
+├── nl2sql/
+│   └── guardrails.py        #   AST guardrails every agent query passes
 ├── vendor/                  # Third-party code copied in, not installed.
 │   └── vercel_ai_sdk.py     #   AI SDK request-body data model. No project
 │                            #   logic goes in here.
@@ -78,7 +83,7 @@ file:
 
 | | `.env.defaults` | `.env` |
 |---|---|---|
-| Holds | `SCHEMA_NAME`, LLM provider/model, region, DB port, the whole quota block | API keys, AWS keys, DB host/user/password/name |
+| Holds | `SCHEMA_NAME`, `WAREHOUSE_ENGINE`, LLM provider/model, region, the whole quota block | API keys, AWS keys, the `SNOWFLAKE_*` account and key-pair settings |
 | Secret | No | **Yes** |
 | In Git | **Yes** | No |
 | AI may read | Yes | **No** — `deny` in `.claude/settings.json` |
@@ -94,7 +99,7 @@ it *is* the reference. A gitignored-plus-template arrangement would put
 AI's swap edits from review — which is the opposite of the point.
 
 `data/` is the third leg and holds no config at all: only authored content
-(copy, prompt, explainer, seed).
+(copy, prompt, explainer, SQL policy).
 
 **The test for which file a value belongs in: is it a secret?** Not "does it
 vary by environment" — that used to be the question, when the split was
@@ -117,7 +122,7 @@ duplicated between `Config` and the dataset config and is gone entirely;
 `schemaName` and `project.name` were two names for one thing and are now one.
 
 **`data/` is content, not config.** Everything in it is authored prose, copy, or
-data: the frontend's strings, the explainer, the system prompt, the SQLite seed.
+data: the frontend's strings, the explainer, the system prompt, the SQL policy.
 Nothing in `agent_app/` parses a config file out of it. Before adding something
 there, ask whether a human wrote it as content; if it is a setting, it goes in
 `.env.defaults`.
@@ -169,17 +174,20 @@ in a component.
 | The 4 capability cards (home page *and* agent page) | `[[capabilities]]` in `data/site.toml` |
 | The 12 kickstart questions, with their render quota | `[[chat.suggestedActions]]` in `data/site.toml` |
 | The long-form "what problem does this solve" explainer | `data/business-context.md` |
-| The PostgreSQL schema name | `SCHEMA_NAME` in `.env.defaults` |
+| The warehouse schema name | `SCHEMA_NAME` in `.env.defaults` |
 | Agent's domain knowledge | `data/system-prompt.md` |
-| The data itself | `dataset/` — source docs plus the generator that builds `<name>.sqlite` |
+| SQL guardrail rules (sensitive / share columns, conversion sources) | `data/sql-policy.toml` |
+| The data itself | `dataset/` — source docs plus the generator that builds `<name>.duckdb` |
 | Dataset-specific write tools | `@tool` methods in `one_04_agent.py` |
 
 The only entry not in `data/` is the last one, because a write tool is code.
 
-Run `mise run cli-check-content` afterwards. It fails on a seed whose foreign keys form a
-cycle (or that has no tables at all), a prompt that queries a nonexistent table,
-missing content files, and a kickstart question whose `render` disagrees with
-its own wording. Right after a swap also run it with the outgoing domain's
+Run `mise run gen-data`, then `mise run cli-check-content`. The check reads the
+DuckDB file (always, whatever `WAREHOUSE_ENGINE` says) and fails on a warehouse
+whose foreign keys form a cycle (or that has no tables at all), a prompt that
+queries a nonexistent table, a `sql-policy.toml` that names a table or column
+the warehouse lacks, missing content files, and a kickstart question whose
+`render` disagrees with its own wording. Right after a swap also run it with the outgoing domain's
 vocabulary, which is a one-off argument rather than committed state:
 
 ```bash
@@ -201,7 +209,10 @@ the build too, since the check script never parses the TOML's icon fields.
 | `runtime.py` | Detects runtime environment (local vs vercel) | When adding a new deployment target (e.g., AWS Lambda). Add new enum value and detection logic. |
 | `constants.py` | Shared enums: the LLM provider list, and the schema-encoding vocabulary | When adding an enum a *second* module needs. A constant with one reader belongs next to that reader, not here. |
 | `utils.py` | Helpers with no project dependencies: `debug` (stderr, never stdout) and `match` (include/exclude patterns) | Same rule as `constants.py` — only what a *second* module needs. |
-| `sql_utils.py` | Pure functions for SQL execution and formatting. Owns one promise: a query run through `execute_sql_query` cannot change the database | When changing how SQL results are formatted or adding new query validation rules. Every failure is *returned as text*, never raised — the caller is an LLM, and a traceback ends its turn. |
+| `sql_utils.py` | Pure functions for SQL execution and formatting. Owns one promise: a query run through `execute_sql_query` cannot change the database | When changing how SQL results are formatted. Every failure is *returned as text*, never raised — the caller is an LLM, and a traceback ends its turn. |
+| `warehouse/engines.py` | `find_duckdb_file`, `new_duckdb_engine` (read-only, `search_path` = `SCHEMA_NAME`), `new_snowflake_engine` (key-pair service user) | When changing how either warehouse is connected to. |
+| `warehouse/dialect.py` | `transpile_to_duckdb`: Snowflake SQL -> DuckDB, with sqlglot | When a Snowflake construct does not transpile. SQL is written in the Snowflake dialect everywhere — prompt, guardrails, `dataset/03-*` queries. |
+| `nl2sql/guardrails.py` | AST guardrails (sqlglot, Snowflake dialect): `PARSE_ERROR`, `MULTI_STATEMENT`, `NOT_SELECT`, `UNKNOWN_TABLE`, `SENSITIVE_COLUMN`, `UNKNOWN_COLUMN`, `CONVERSION_MIX`, `RATIO_AVG`; rewrites `CURRENT_DATE` to the data's reference date and adds a `LIMIT` | When adding a generic check. The table/column allowlist comes from reflection and the dataset rules from `data/sql-policy.toml`, so a dataset swap edits neither this module nor its tests. |
 | `ai_sdk_adapter.py` | Converts Vercel AI SDK messages <-> Strands Agent messages, and generates the SSE event stream back to the browser | When the frontend message format changes. **Not** when switching LLM provider — this file is provider-agnostic and must stay that way; provider code belongs in `one_04_agent.py`. |
 | `vendor/vercel_ai_sdk.py` | Pydantic data model for the AI SDK request body. Vendored from `vercel-ai-sdk-mate`, deliberately lenient so a new AI SDK release cannot break request parsing | When the frontend starts sending a message part type the backend needs to read: add the model class and one line to `PART_MODEL_BY_TYPE`. Keep it a pure data model — no provider logic. |
 
@@ -217,7 +228,7 @@ the build too, since the check script never parses the TOML's icon fields.
 |------|--------------|----------------|
 | `one_00_main.py` | Defines `One` class that inherits all mixins; creates `one` singleton | When adding a new mixin (import it and add to inheritance list). |
 | `one_01_config.py` | `ConfigMixin`: provides `self.config` | Rarely. Config loading logic is in `config.py`. |
-| `one_02_db.py` | `DbMixin`: provides `self.engine`, `self.local_sqlite_engine`, `self.remote_postgres_engine` | When adding new database connections or changing engine selection logic. |
+| `one_02_db.py` | `DbMixin`: provides `self.engine` (chosen by `WAREHOUSE_ENGINE`), `self.db_type`, `self.reflected_metadata` (tables and views), `self.database_schema_str`, `self.guardrail_policy`, `self.execute_sql_query` | When changing engine selection or the guardrails -> transpile -> execute pipeline. |
 | `one_03_boto3.py` | `Boto3Mixin`: provides `self.boto_ses`, `self.bedrock_runtime_client()` | When adding new AWS service clients (S3, DynamoDB, etc.). |
 | `one_04_agent.py` | `AgentMixin`: provides `self.agent` and all `@tool` methods | **Most common edit.** When adding/modifying agent tools. Add `@tool` method here, then register in `self.agent`'s `tools=[]` list. |
 | `api.py` | Exports `one = One()` singleton | Rarely. Only touched when restructuring exports. |
@@ -229,6 +240,7 @@ the build too, since the check script never parses the TOML's icon fields.
 | `system-prompt.md` | System prompt for the BI agent | When changing agent behavior, adding tool usage instructions, or updating workflow guidelines. The five rendering sections are copied verbatim from `.claude/skills/swap-dataset-cn/ref/system-prompt-render-blocks.md`; change them in both places or neither. |
 | `site.toml` | Every sentence the UI says, the 4 capability cards, the 12 kickstart questions | When changing any user-visible string. Never inline copy in a component. |
 | `business-context.md` | The long-form explainer behind the home page | When the domain explanation changes. At most one mermaid diagram in the file. |
+| `sql-policy.toml` | Dataset rules for the SQL guardrails: sensitive columns, share columns (no `AVG`), conversion sources that must not be mixed | When the dataset's sensitive or ratio columns change. `cli-check-content` fails if it names a table or column the warehouse lacks. |
 
 **db_schema/ Directory:**
 
@@ -241,9 +253,11 @@ Three steps in one direction — reflect, model, encode — and nothing flows ba
 | `encoder.py` | The models -> the compact string the agent is shown. Pure formatting, no database access | When changing how the schema is presented to the LLM. Re-run `mise run cli-print-db-schema` and eyeball the diff — this string is the agent's entire picture of the database. |
 | `api.py` | Public re-exports | When adding a function the rest of the app calls. |
 
-Scoped to what this app runs on. `DbTypeEnum` lists the two engines with code
-paths (SQLite seed, PostgreSQL serving) rather than the ten it once advertised —
-a menu of unimplemented options reads as support that does not exist. The type
+Scoped to what this app runs on. `DbTypeEnum` lists only engines with code
+paths — `DUCKDB` and `SNOWFLAKE` (the two `WarehouseEngineEnum` values), plus
+`SQLITE` for the in-memory databases of the unit tests — rather than the ten it
+once advertised: a menu of unimplemented options reads as support that does not
+exist. The type
 mapping is the deliberate exception: a missing key degrades to the dialect's own
 spelling rather than failing, so breadth there costs nothing.
 
@@ -255,10 +269,12 @@ One (one_00_main.py)
 │   └── self.config -> Config instance (from config.py)
 │
 ├── DbMixin (one_02_db.py)
-│   ├── self.remote_postgres_engine -> PostgreSQL (NeonDB)
-│   ├── self.engine                -> Auto-selects based on runtime
+│   ├── self.engine                -> DuckDB file or Snowflake, by WAREHOUSE_ENGINE
+│   ├── self.db_type               -> DbTypeEnum of that engine
+│   ├── self.reflected_metadata    -> Tables AND views of SCHEMA_NAME
 │   ├── self.database_schema_str   -> LLM-optimized schema string
-│   └── self.execute_sql_query(sql)        -> Markdown table
+│   ├── self.guardrail_policy      -> Reflected allowlist + data/sql-policy.toml
+│   └── self.execute_sql_query(sql)        -> Guardrails -> transpile (DuckDB) -> Markdown table
 │
 ├── Boto3Mixin (one_03_boto3.py)
 │   ├── self.boto_ses              -> boto3.Session
@@ -289,8 +305,13 @@ does.
 **Pure Functions (sql_utils.py):**
 - `format_result(result)` - Format SQL result as Markdown table
 - `ensure_valid_select_query(query)` - Validate SELECT statement
-- `execute_sql_query(engine, sql)` - Execute a read-only query, return Markdown
-- `new_sqlite_engine(path)` - Open SQLite so that the rollback guarantee holds
+- `execute_sql_query(engine, sql)` - Execute a query in an always-rolled-back transaction, return Markdown
+- `new_sqlite_engine(path)` - Open SQLite so that the rollback guarantee holds (used by the unit tests)
+
+`DbMixin.execute_sql_query` wraps the last one: it runs `validate_sql` first
+(a rejection comes back as `Error: rejected by the SQL guardrails. ...`),
+transpiles to DuckDB when that is the engine, and appends a note naming the
+conversion source used or any reference-date rewrite.
 
 ### Key Singletons
 
@@ -300,6 +321,7 @@ from agent_app.paths import path_enum   # All paths
 from agent_app.runtime import runtime   # Runtime detection
 
 one.config.schema_name                 # SCHEMA_NAME, from .env.defaults
+one.config.warehouse_engine            # WAREHOUSE_ENGINE: "duckdb" | "snowflake"
 ```
 
 ### Agent Framework
@@ -330,7 +352,7 @@ one.config.schema_name                 # SCHEMA_NAME, from .env.defaults
 **Environment Variables (.env):**
 
 > ⚠️ **Never read, print, or otherwise open `.env`.** It holds real credentials —
-> API keys, database passwords, AWS tokens. Read `.env.example` instead: it is the
+> API keys, the Snowflake private key, AWS tokens. Read `.env.example` instead: it is the
 > committed, placeholder-only template and documents every supported variable.
 > If you need to know whether a variable is *set*, check for the key name via
 > `.env.example`, or ask the user — do not `cat` / `Read` the `.env` file.
@@ -352,13 +374,19 @@ AWS_REGION=us-east-1
 # OPENAI_API_KEY=sk-...          (requires: uv sync --extra openai)
 # GOOGLE_API_KEY=...             (requires: uv sync --extra gemini)
 
-# Required everywhere: the agent reads PostgreSQL in every environment
-# DB_HOST=ep-xxx-pooler.us-east-1.aws.neon.tech
-# DB_PORT=5432
-# DB_USER=neondb_owner
-# DB_PASS=your_password
-# DB_NAME=neondb
+# Only when WAREHOUSE_ENGINE="snowflake" (.env.defaults; default "duckdb" needs none).
+# A key-pair service user: no password exists, its role holds only USAGE + SELECT.
+# SNOWFLAKE_ACCOUNT=myorg-myaccount
+# SNOWFLAKE_USER=...
+# SNOWFLAKE_ROLE=...
+# SNOWFLAKE_WAREHOUSE=...
+# SNOWFLAKE_DATABASE=...
+# SNOWFLAKE_PRIVATE_KEY_PATH=tmp/snowflake/...pem   (or SNOWFLAKE_PRIVATE_KEY=<PEM>, which wins)
 ```
+
+The default `WAREHOUSE_ENGINE="duckdb"` opens the local file read-only; set
+`DUCKDB_PATH` only to point at a file other than the discovered
+`dataset/*.duckdb`.
 
 For `LLM_PROVIDER=bedrock` locally, do **not** set `AWS_ACCESS_KEY_ID` /
 `AWS_SECRET_ACCESS_KEY` in `.env` — boto3 reads env vars before `~/.aws/credentials`,
@@ -380,24 +408,35 @@ tests_python/
 ├── db_schema/
 │   ├── test_db_schema_encoder.py   # Tests for encoder.py
 │   └── test_db_schema_extractor.py # Tests for extractor.py
+├── nl2sql/
+│   └── test_nl2sql_guardrails.py   # Tests for guardrails.py (fictional acme policy)
+├── warehouse/
+│   └── test_warehouse_engines.py   # Tests for engines.py and dialect.py
 ├── one/
 │   ├── test_one_one_00_main.py     # Tests for One class
 │   ├── test_one_one_01_config.py   # Tests for ConfigMixin
-│   └── test_one_one_02_db.py       # Tests for DbMixin
+│   └── test_one_one_02_db.py       # Tests for DbMixin (needs the DuckDB file)
 ├── test_api.py                     # Tests for api.py
+├── test_cli.py                     # Tests for cli.py
+├── test_content_check.py           # Tests for content_check.py
+├── test_sql_utils.py               # Tests for sql_utils.py (in-memory SQLite)
 ├── test_source_code.py             # Tests for source_code.py (the TDD lesson)
 └── test_utils.py                   # Tests for utilities
 ```
 
-**No test opens a network connection.** The `db_schema` tests build
-`sa.MetaData` by hand and reflect through in-memory SQLite, which is enough
-because the extractor only ever touches SQLAlchemy objects. What genuinely needs
-PostgreSQL — `search_path` pinning, the remote sync — is exercised by the
-numbered scripts in `scripts/`, not by pytest.
+**Build the warehouse before testing.** Tests that go through `one.engine` (e.g.
+`test_one_one_02_db.py`) read the real `dataset/*.duckdb`, so a fresh checkout
+runs `mise run gen-data` first.
+
+**No test opens a network connection.** The `db_schema` and `sql_utils` tests
+reflect or query in-memory SQLite, which is enough because that code only ever
+touches SQLAlchemy objects. The Snowflake engine is built in
+`test_warehouse_engines.py` but never connected; `mise run cli-test-db-conn` is
+the only thing that reaches a real Snowflake account.
 
 **Use a fictional domain in test fixtures** (`acme`, `widget`, `part`), never
-this dataset's real table names. A test asserting on `loan` silently becomes a
-lie the next time the dataset is swapped.
+this dataset's real table names. A test asserting on `campaign` silently becomes
+a lie the next time the dataset is swapped.
 
 **Node.js Tests:**
 - Location: `tests_node/`
@@ -421,13 +460,15 @@ lie the next time the dataset is swapped.
 - `mise run dev` - Start all development servers (Next.js + FastAPI, auto-kills this project's old instances first)
 - `mise run kill` - Kill this project's development servers
 - `mise run build-web` - Build the Next.js frontend; the only check for `site.toml` keys and icon names
+- `mise run gen-data` - Build `dataset/<name>.duckdb` from the dataset's generator (= `agent-app gen-data`; replaces any existing `.duckdb` file)
 
 Tasks prefixed `cli-` are one-line wrappers over the `agent-app` console script, grouped
 under a `# cli` banner in `mise.toml`. A task without the prefix does its own work; one
 with it is a door onto a subcommand you can also run directly:
 
-- `mise run cli-check-content` - Verify `data/` still agrees with the prompt and the seed (run after a dataset swap)
-- `mise run cli-test-db-conn` - Check this machine can reach the cloud PostgreSQL (`SELECT 1`)
+- `mise run cli-check-content` - Verify `data/` still agrees with the prompt and the DuckDB file (run after a dataset swap)
+- `mise run cli-test-db-conn` - Check the configured warehouse (`WAREHOUSE_ENGINE`) answers `SELECT 1` on `one.engine`
+- `mise run cli-print-db-schema` - Print the schema exactly as the agent is shown it
 
 `check-content` and `build-web` are the two halves of "did the swap land", and
 neither catches what the other does. Run both.
@@ -435,9 +476,11 @@ neither catches what the other does. Run both.
 ### The app's own CLI
 
 ```bash
+.venv/bin/agent-app gen-data [--seed 42]
 .venv/bin/agent-app check-content
 .venv/bin/agent-app check-content --retired "patient,bed,ward"
 .venv/bin/agent-app test-db-conn
+.venv/bin/agent-app print-db-schema
 ```
 
 Installed as a console script by `[project.scripts]` in `pyproject.toml`, backed
@@ -459,11 +502,10 @@ returned value and then exits 0, so a check that returned 1 would print `1` and 
 it separates *cannot reach the database* from *reached it, but the schema is empty* —
 two failures that otherwise look alike.
 
-**Only application commands belong here.** Building the dataset and publishing it
-to PostgreSQL stay in the teaching layer's own CLI (`teaching_cli.py`): that layer
-is deleted as whole directories, and a shared entry point would leave a broken
-subcommand behind. The test for a new command is the repo's usual one — is it part
-of this app, or part of teaching someone to build it?
+**Only application commands belong here** — building the local warehouse file
+included: in this repo the dataset is part of the app. `gen-data` discovers the
+single `dataset/04-*generator*.py` rather than naming it, so a dataset swap never
+edits `agent_app/`.
 
 ### Running the dev server from an agent session
 
@@ -482,7 +524,11 @@ until grep -q "Ready in" <task-output-file>; do sleep 0.5; done
 ```
 
 Both halves have to be up, and they log different lines: Next.js prints
-`Ready in`, uvicorn prints `Application startup complete.`. Do not poll with a
+`Ready in`, uvicorn prints `Application startup complete.`. Next.js runs as
+`next dev --webpack` (Turbopack's dev server cannot resolve the multi-parameter
+`next/font/google` URL in `app/layout.tsx`; see the comment in `mise.toml`), and
+`next.config.js` pins `turbopack.root` to this repo so a stray lockfile further
+up never becomes the workspace root. Do not poll with a
 bare `for` loop and no `sleep` -- that spins the CPU and returns instantly
 whether or not the thing ever became ready.
 
@@ -510,56 +556,58 @@ avoids that entirely.
 
 ## Database
 
-**Two databases, two naming schemes:**
+**One schema, two engines,** chosen by `WAREHOUSE_ENGINE` in `.env.defaults`:
 
-| | Local seed | What the agent reads |
+| | `duckdb` (default) | `snowflake` |
 |---|---|---|
-| Engine | SQLite `dataset/<name>.sqlite` | PostgreSQL (NeonDB) |
-| Table names | `loan`, `customer`, … | `loan`, `customer`, … — **identical** |
-| Used by | the sync's source, and tests | every environment, laptop included |
+| Where | local file `dataset/<name>.duckdb`, opened read-only | the deployed warehouse, via `snowflake-sqlalchemy` |
+| Auth | none | key-pair service user (`SNOWFLAKE_*` in `.env`, see `.env.example`); role has only `USAGE` + `SELECT` |
+| Schema / tables | `lumina_reach`: 21 tables + 2 views (`v_reference_date`, `mv_attribution_six_models`) | the same schema, same names — **identical** |
+| Used by | development, tests, evaluation | deployment |
+
+**SQL is written in the Snowflake dialect everywhere** — the system prompt, the
+guardrails, the golden queries in `dataset/03-*`. On DuckDB,
+`agent_app/warehouse/dialect.py` transpiles the validated query with sqlglot
+just before it runs, so every SQL example is written once and is right on both
+engines.
 
 **The database is not in Git.** `dataset/` holds the source documents and the
-generator; running the generator produces `dataset/<name>.sqlite`, which
-`.gitignore` excludes along with `dataset/data/*.tsv`. A fresh checkout therefore
-has to build it:
+generator; `dataset/.gitignore` excludes the `.duckdb` file it produces. A fresh
+checkout therefore has to build it (`dataset/requirements.txt` is just `duckdb`,
+already a project dependency):
 
 ```bash
-.venv/bin/python .claude/skills/about-ba-agent-app-scaffold-cn/scripts/teaching_cli.py gen-data
-.venv/bin/python .claude/skills/about-ba-agent-app-scaffold-cn/scripts/teaching_cli.py sync-db
+mise run gen-data          # = .venv/bin/agent-app gen-data [--seed 42]
 ```
 
-Those are **not** mise tasks on purpose: `mise.toml` runs the application, and
-none of this is the application. The teaching layer is a set of directories you
-delete, not lines to pick out of a shared config.
+`agent_app/warehouse/engines.py:find_duckdb_file` **discovers** that file rather
+than naming it — the filename belongs to the dataset, and naming it would make a
+swap edit `agent_app/`, which is the one thing that package is not supposed to
+need. Zero matches and several matches both raise, with the fix in the message.
+A file named exactly like its schema is rejected too: DuckDB names the catalog
+after the file, which would make every qualified reference ambiguous.
 
-`agent_app/paths.py` **discovers** that file rather than naming it — the
-filename belongs to the dataset, and naming it would make a swap edit
-`agent_app/`, which is the one thing that package is not supposed to need. Zero
-matches and several matches both raise, with the fix in the message.
+The isolation is a **schema**, not a table-name prefix: `SCHEMA_NAME` in
+`.env.defaults`, set as the DuckDB `search_path` and as the Snowflake URL's
+schema, so the agent writes `FROM campaign` and never names the schema. Table
+names are the same on both engines, and that is the whole point — a prefix that
+depended on which engine was behind it would make every SQL example in the
+system prompt right in one environment and wrong in the other, with nothing
+failing loudly. `reflected_metadata` reflects only that schema (tables **and**
+views), so the agent never sees anything else, and the guardrails' `UNKNOWN_TABLE`
+refuses anything outside it.
 
-The remote instance is **shared with other projects**, and the isolation is a
-PostgreSQL **schema**, not a table-name prefix: `SCHEMA_NAME` in
-`.env.defaults`. Table names are the same on both sides, and that is the
-whole point — an earlier revision prefixed every table (`smbll_loan`), which
-made the name the agent saw depend on which engine was behind it, so every SQL
-example in the system prompt was right in one environment and wrong in the
-other, with nothing failing loudly.
+**Every agent query passes three layers**, with guardrail and execution failures
+returned as text:
+`nl2sql/guardrails.py` (AST checks, rules from reflection plus
+`data/sql-policy.toml`), the DuckDB transpile, then `sql_utils.execute_sql_query`
+in a transaction that is always rolled back, on a read-only connection.
 
-Foreign keys are rewritten into the schema, and the sync only ever touches its
-own schema — other projects' tables are never dropped. `database_schema_str`
-reflects only that schema, so the agent never sees another project's tables.
-
-Dependency order is **computed, not configured**: `table_insert_order()` in
-`agent_app/tests/db_sync.py` is a thin name over SQLAlchemy's
-`metadata.sorted_tables`, itself a topological sort of the reflected foreign
-keys. Inserts walk it forwards, drops walk it backwards. **Adding a table needs
-no config change** — reflect it and the order updates itself.
-
-There used to be a hand-written `tableInsertOrder` list plus a check comparing
-it against the seed. Both are gone: a hand-copied topological sort is a value
-that can be wrong, and the only thing that check could catch was someone copying
-it wrong. `mise run cli-check-content` now verifies the thing derivation *cannot* fix — that
-the foreign keys admit an order at all, i.e. contain no cycle.
+Dependency order is **computed, not configured**: SQLAlchemy's
+`metadata.sorted_tables` is a topological sort of the reflected foreign keys.
+**Adding a table needs no config change.** `mise run cli-check-content` verifies
+the one thing derivation *cannot* fix — that the foreign keys admit an order at
+all, i.e. contain no cycle.
 
 **Schema Reference:**
 - Run `mise run cli-print-db-schema` to print the schema.
@@ -571,8 +619,10 @@ the foreign keys admit an order at all, i.e. contain no cycle.
 mise run cli-print-db-schema
 ```
 
-**Run SQL Locally:** open the seed in a SQL client (DBeaver locally, the Neon SQL
-editor in a codespace). The repo ships no script for it — a client does it better.
+**Run SQL Locally:** open `dataset/<name>.duckdb` in DBeaver or the `duckdb` CLI
+(`duckdb -readonly dataset/<name>.duckdb`, then `SET search_path = 'lumina_reach'`).
+Note that a client speaks DuckDB SQL, not the Snowflake dialect the agent writes.
+The repo ships no script for it — a client does it better.
 
 ---
 
@@ -584,25 +634,14 @@ it now lives where it belongs, which is the point:
 | What it used to be | Where it went |
 |---|---|
 | `test_00` config preflight | `mise run cli-check-content` |
-| `test_02` / `test_03` run SQL locally | Nothing. Use a SQL client — DBeaver locally, the Neon SQL editor in a codespace |
+| `test_02` / `test_03` run SQL locally | Nothing. Open the `.duckdb` file in DBeaver or the `duckdb` CLI |
 | `test_04` print the LLM schema | `mise run cli-print-db-schema` |
 | `test_05` database connectivity | `mise run cli-test-db-conn` |
-| `test_06` / `test_07` sync and verify | The teaching layer's own `scripts/01_*.py` and `02_*.py`, next to `teaching_cli.py` |
-| `test_11`–`test_15` per-provider probes | The course, under `examples/15-call-the-model-directly/` |
+| `test_06` / `test_07` build and verify the data | `mise run gen-data`, then `mise run cli-check-content` |
+| `test_11`–`test_15` per-provider probes | Not in this repo |
 
-Only `test_agent.py` is left, and it is on its way into the course too.
+Only `test_agent.py` is left.
 
-Moving `test_06` / `test_07` was not tidying. The teaching layer's CLI used to reach
-*back* into the repo's top-level `scripts/` to find them, which meant the layer that
-is supposed to be deleted as whole directories had a piece of itself lying outside
-those directories. Publishing would have removed the CLI and left the two scripts,
-or removed the scripts and broken the CLI.
-
-**Do not add anything to `scripts/`.** A new command belongs in one of three places,
-and the test is the same one the rest of the repo uses:
-
-| Is it… | Then it goes |
-|---|---|
-| part of the application | `agent_app/cli.py`, plus a one-line `cli-` task in `mise.toml` |
-| part of building or publishing the dataset | the teaching layer's own CLI, which gets deleted wholesale |
-| a demonstration for one lesson | that lesson's own directory, `examples/NN-*/` |
+**Do not add anything to `scripts/`.** A new command is part of the application,
+so it goes in `agent_app/cli.py`, plus a one-line `cli-` task in `mise.toml`
+(the dataset build is one too: `agent-app gen-data`, run as `mise run gen-data`).

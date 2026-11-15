@@ -280,7 +280,7 @@ def check_prompt_tables(report: Report, db_tables: set[str]) -> bool:
     in prose: the dialect section says to write ``EXTRACT(QUARTER FROM d)``, and
     a whole-file scan reads that as a query against a table called ``d``.
 
-    A dotted name is skipped too. ``EXTRACT(QUARTER FROM l.disbursement_date)``
+    A dotted name is skipped too. ``EXTRACT(QUARTER FROM ds.report_date)``
     is a column reference that happens to follow ``FROM``.
 
     Names the prompt defines itself as CTEs (``WITH early_behavior AS (...)``)
@@ -298,7 +298,7 @@ def check_prompt_tables(report: Report, db_tables: set[str]) -> bool:
     referenced = set(
         name.lower()
         for name in re.findall(
-            # The trailing `(?!\.)` drops `FROM l.disbursement_date`, which is a
+            # The trailing `(?!\.)` drops `FROM ds.report_date`, which is a
             # column inside EXTRACT rather than a table.
             r"\b(?:FROM|JOIN)\s+([a-z_][a-z0-9_]*)(?!\s*\.)",
             sql_blocks,

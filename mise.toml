@@ -68,7 +68,7 @@ description = "🧱 Build the local DuckDB warehouse file from the dataset's gen
 run = ".venv/bin/agent-app gen-data"
 
 [tasks.cli-test-db-conn]
-# The smallest possible round trip to the cloud database: connect, SELECT 1,
+# The smallest possible round trip to the configured warehouse: connect, SELECT 1,
 # disconnect. It names no schema and no table on purpose, so that a failure here
 # means credentials or network and nothing else. When the agent is not working,
 # this is the first thing to run: it separates "cannot reach the database" from
