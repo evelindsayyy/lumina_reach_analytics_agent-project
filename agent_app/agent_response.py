@@ -125,6 +125,13 @@ MODEL_THROTTLED_MESSAGE = (
     "needs a higher model quota or a different LLM_PROVIDER."
 )
 
+#: Shown when the agent cannot open its connection to the MCP server, so it
+#: has no way to read the warehouse.
+TOOLS_UNREACHABLE_MESSAGE = (
+    "I could not reach the data tools service, so I could not look anything up. "
+    "Please try again in a moment; if it keeps failing, the MCP runtime is down."
+)
+
 #: Shown for any other failure inside the agent turn. The details go to the
 #: server log, not to the reader.
 MODEL_FAILED_MESSAGE = (
@@ -140,8 +147,11 @@ def agent_error_message(error: Exception) -> str:
     A turn that raises would otherwise reach the browser as a bare HTTP 500,
     which the chat UI renders as a broken turn with no explanation.
     """
+    from strands.types.exceptions import MCPClientInitializationError
     from strands.types.exceptions import ModelThrottledException
 
     if isinstance(error, ModelThrottledException):
         return MODEL_THROTTLED_MESSAGE
+    if isinstance(error, MCPClientInitializationError):
+        return TOOLS_UNREACHABLE_MESSAGE
     return MODEL_FAILED_MESSAGE

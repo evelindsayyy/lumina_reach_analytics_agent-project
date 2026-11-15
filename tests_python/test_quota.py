@@ -179,7 +179,7 @@ class TestCheckQuota:
             check_quota(dynamodb, config, app_id="x")
 
     def test_app_id_defaults_to_this_month(self, dynamodb):
-        """The production path: api/index.py passes no app_id."""
+        """The production path: the agent runtime passes no app_id."""
         config = make_config()
         increment_usage(dynamodb, config, invokes=100, input_tokens=0, output_tokens=0)
         with pytest.raises(QuotaExceededError, match=get_app_id(config)):
@@ -199,7 +199,7 @@ class TestDisabled:
     """
     The flag lives with the feature, not with the caller.
 
-    api/index.py calls both entry points unguarded, so "off" has to mean "does
+    agent_app/runtimes/chat_turn.py calls both entry points unguarded, so "off" has to mean "does
     nothing and touches no AWS" rather than "the caller remembered an if".
     """
 

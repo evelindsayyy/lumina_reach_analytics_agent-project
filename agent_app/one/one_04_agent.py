@@ -1,11 +1,17 @@
 # -*- coding: utf-8 -*-
 
-"""AI Agent mixin for the One class."""
+"""
+The model and the agent's own tool, for the One class.
+
+The agent itself is built per request in
+:mod:`agent_app.runtimes.analytics_agent`; its data tools live on the MCP
+server, :mod:`agent_app.runtimes.analytics_mcp`.
+"""
 
 import typing as T
 from functools import cached_property
 
-from strands import Agent, tool
+from strands import tool
 from strands.models import BedrockModel
 
 from ..paths import path_enum
@@ -51,7 +57,7 @@ def load_strands_model_class(class_name: str, provider: str):
 
 
 class AgentMixin:
-    """Mixin providing AI agent and tool definitions for database queries."""
+    """Mixin providing the model of ``LLM_PROVIDER`` and the agent's own tool."""
 
     @cached_property
     def bedrock_model(self: "One") -> BedrockModel:  # pragma: no cover - needs AWS
@@ -116,77 +122,6 @@ class AgentMixin:
             f"No model builder for LLM_PROVIDER={provider!r}."
         )
 
-    @cached_property
-    def agent(self: "One") -> Agent:  # pragma: no cover - builds a real Agent
-        """Create an Agent instance with the configured model."""
-        return Agent(
-            model=self.model,
-            system_prompt=path_enum.path_bi_agent_system_prompt_content,
-            tools=[
-                # Read-only tools
-                self.tool_get_database_schema,
-                self.tool_execute_sql_query,
-                self.tool_write_debug_report,
-                # Write operation tools are dataset specific: when a dataset needs
-                # them, add the @tool methods here and register them in this list.
-            ],
-        )
-
-    @tool(
-        name="get_database_schema",
-    )
-    def tool_get_database_schema(
-        # self: "One",  # keep for IDE type hints, strands @tool doesn't support typed self
-        self,  # uncomment this and comment above when running with strands
-    ) -> str:
-        """
-        Retrieve the complete database schema information in LLM-optimized compact format.
-
-        This tool returns the structure of all tables in the business database,
-        including:
-        - Table names and column definitions
-        - Data types (simplified to STR, INT, DEC, TS, DT, etc.)
-        - Constraints: Primary Key (*PK), Unique (*UQ), Not Null (*NN), Index (*IDX)
-        - Foreign key relationships (*FK->Table.Column)
-
-        Use this tool FIRST to understand the database structure before writing SQL queries.
-        The compact format reduces token usage by ~70% compared to verbose SQL DDL.
-
-        Returns:
-            A string containing the encoded database schema in compact format.
-        """
-        return self.database_schema_str
-
-    @tool(
-        name="execute_sql_query",
-    )
-    def tool_execute_sql_query(
-        # self: "One",  # keep for IDE type hints, strands @tool doesn't support typed self
-        self,  # uncomment this and comment above when running with strands
-        sql: str,
-    ) -> str:
-        """
-        Execute a SQL SELECT query and return results as a Markdown table.
-
-        This tool runs the provided SQL query against the business database and
-        returns the results formatted as a Markdown table.
-        Markdown tables are token-efficient (~24% fewer tokens than JSON) and
-        easy for LLMs to parse.
-
-        Args:
-            sql: A valid SQL SELECT query string to execute.
-
-        Returns:
-            - On success: A Markdown-formatted table with query results
-            - If no rows match: "No result"
-            - On error: An error message describing what went wrong
-
-        Note:
-            Only SELECT queries are supported. Use get_database_schema first to
-            understand available tables and columns before constructing queries.
-        """
-        return self.execute_sql_query(sql=sql)
-
     @tool(
         name="write_debug_report",
     )
@@ -212,9 +147,11 @@ class AgentMixin:
         Returns:
             A confirmation message with the file path.
         """
+        # Returned, never raised: a read-only filesystem (a deployed runtime)
+        # must not end a turn whose answer is already written.
         try:
-            path_enum.path_debug_report_md.write_text(content, encoding="utf-8")
-        except FileNotFoundError:
             path_enum.dir_tmp.mkdir(parents=True, exist_ok=True)
             path_enum.path_debug_report_md.write_text(content, encoding="utf-8")
+        except OSError as e:
+            return f"Debug report not written ({type(e).__name__}: {e}); carry on."
         return f"Debug report written to: {path_enum.path_debug_report_md}"

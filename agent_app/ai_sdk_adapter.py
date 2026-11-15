@@ -15,15 +15,12 @@ file. Provider-specific code belongs next to the model construction in
 The request data model itself is vendored in ``vendor/vercel_ai_sdk.py``.
 """
 
-import sys
 import json
 import uuid
 import typing as T
 
-from fastapi import Request
-from fastapi.responses import StreamingResponse
+from starlette.responses import StreamingResponse
 
-from .utils import debug
 from .vendor.vercel_ai_sdk import RequestBody
 
 
@@ -138,35 +135,3 @@ def ai_sdk_streaming_response(
     )
     response.headers.update(SSE_HEADERS)
     return response
-
-
-# ------------------------------------------------------------------------------
-# Request logging
-# ------------------------------------------------------------------------------
-
-#: Headers replaced with a placeholder before logging. These logs are retained
-#: by the host, so anything that authenticates a caller must not reach them.
-SENSITIVE_HEADERS = frozenset(
-    {"authorization", "proxy-authorization", "cookie", "set-cookie", "x-api-key"}
-)
-
-REDACTED = "<redacted>"
-
-
-async def read_request_body(request: Request) -> dict:
-    """
-    Read the JSON body, logging the request on the way through.
-
-    Logs *and* returns because a request body can only be read once: reading it
-    here and throwing it away would leave the caller with nothing to parse.
-    """
-    debug("====== Incoming request")
-    debug("------ Request Headers")
-    for key, value in request.headers.items():
-        shown = REDACTED if key.lower() in SENSITIVE_HEADERS else value
-        debug(f"{key}: {shown}")
-    debug("------ Request Body")
-    request_body_data = await request.json()
-    debug(json.dumps(request_body_data, indent=2, ensure_ascii=False))
-    sys.stderr.flush()
-    return request_body_data

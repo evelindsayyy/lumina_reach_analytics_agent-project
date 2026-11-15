@@ -9,15 +9,12 @@ type does not raise, it just leaves the browser spinning forever.
 """
 
 import json
-import asyncio
 
 from agent_app.ai_sdk_adapter import (
-    REDACTED,
     SSE_HEADERS,
     ai_sdk_message_with_reasoning_generator,
     ai_sdk_streaming_response,
     get_last_user_message_text,
-    read_request_body,
     request_body_to_agent_history,
 )
 from agent_app.vendor.vercel_ai_sdk import RequestBody
@@ -158,46 +155,3 @@ class TestStreamingResponse:
         assert ai_sdk_streaming_response("answer", reasoning_text="why").status_code == 200
 
 
-class StubRequest:
-    """Enough of a FastAPI Request for the logger: headers, and an awaitable body."""
-
-    def __init__(self, headers, payload):
-        self.headers = headers
-        self._payload = payload
-
-    async def json(self):
-        return self._payload
-
-
-class TestRequestLogging:
-    def test_credentials_are_not_written_to_the_log(self, capsys):
-        """
-        These logs are retained by the host, so anything that authenticates a
-        caller must never reach them.
-        """
-        request = StubRequest(
-            headers={
-                "authorization": "Bearer sk-secret",
-                "cookie": "session=abc",
-                "content-type": "application/json",
-            },
-            payload={"id": "c1", "messages": []},
-        )
-        result = asyncio.run(read_request_body(request))
-
-        err = capsys.readouterr().err
-        assert "sk-secret" not in err
-        assert "session=abc" not in err
-        assert err.count(REDACTED) == 2
-        # Non-sensitive headers still come through, or the log is useless.
-        assert "application/json" in err
-        # Returns the body too, because a request can only be read once.
-        assert result == {"id": "c1", "messages": []}
-
-    def test_case_does_not_matter(self, capsys):
-        """HTTP header names are case-insensitive; a client may send Authorization."""
-        request = StubRequest(
-            headers={"Authorization": "Bearer sk-secret"}, payload={"messages": []}
-        )
-        asyncio.run(read_request_body(request))
-        assert "sk-secret" not in capsys.readouterr().err

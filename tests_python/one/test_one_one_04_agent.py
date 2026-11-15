@@ -1,15 +1,8 @@
 # -*- coding: utf-8 -*-
 
 """
-Test for the agent's read-only tools.
-
-These call the tool methods directly, the same way the strands agent does at
-runtime, but without building a model or an Agent -- so no API key, no network,
-no tokens spent. The tools only touch the local DuckDB warehouse file and the
-filesystem, which is what makes that possible.
-
-The write-operation tools are not covered here: they are commented out of the
-agent's tool list and target tables that do not exist in this dataset.
+Tests for the model dispatch and the agent's own tool. The data tools are
+tested with the MCP server, in ``tests_python/runtimes``.
 """
 
 import pytest
@@ -18,57 +11,7 @@ from agent_app.one.one_00_main import one
 from agent_app.paths import path_enum
 
 
-class TestReadOnlyTools:
-    def test_get_database_schema(self):
-        """The schema tool returns the encoded schema, including real tables."""
-        result = one.tool_get_database_schema()
-        assert isinstance(result, str)
-        assert "daily_stats" in result
-        assert "v_reference_date" in result  # views are part of the schema
-
-    def test_execute_sql_query(self):
-        """A valid SELECT comes back as a Markdown table."""
-        result = one.tool_execute_sql_query(sql="SELECT COUNT(*) AS n FROM campaign")
-        assert "|" in result  # Markdown table pipes
-        assert "n" in result
-
-    def test_execute_sql_query_no_rows(self):
-        """A query matching nothing says so instead of returning an empty table."""
-        result = one.tool_execute_sql_query(sql="SELECT 1 WHERE 1 = 0")
-        assert result == "No result"
-
-    def test_execute_sql_query_accepts_cte(self):
-        """A CTE opens with WITH, not SELECT, and must still be allowed."""
-        result = one.tool_execute_sql_query(
-            sql="WITH d AS (SELECT campaign_id FROM campaign) SELECT COUNT(*) AS n FROM d"
-        )
-        assert "|" in result
-        assert "n" in result
-
-    def test_execute_sql_query_rejects_non_select(self):
-        """Write statements are refused: this agent is read-only."""
-        result = one.tool_execute_sql_query(sql="DROP TABLE campaign")
-        assert "NOT_SELECT" in result
-
-    def test_write_hidden_behind_a_cte_does_not_land(self):
-        """
-        A write can hide behind a CTE, so the opening keyword alone cannot
-        decide this. The guardrails refuse it, and below them the warehouse file is read-only and every
-        agent query runs in a transaction that is always rolled back -- so the
-        assertion is on the row count, not on an error string.
-        """
-        before = one.tool_execute_sql_query(sql="SELECT COUNT(*) AS n FROM campaign")
-        one.tool_execute_sql_query(
-            sql="WITH d AS (SELECT campaign_id FROM campaign) DELETE FROM campaign"
-        )
-        after = one.tool_execute_sql_query(sql="SELECT COUNT(*) AS n FROM campaign")
-        assert before == after
-
-    def test_execute_sql_query_reports_bad_sql(self):
-        """A broken query returns an error string rather than raising."""
-        result = one.tool_execute_sql_query(sql="SELECT * FROM no_such_table")
-        assert result.startswith("Error")
-
+class TestDebugReportTool:
     def test_write_debug_report(self):
         """The debug report tool writes the file and returns its path."""
         content = "# Debug Report\n\nHello from the test suite.\n"
@@ -206,3 +149,18 @@ class TestWriteDebugReportCreatesTmp:
         result = one.tool_write_debug_report(content="# Report")
         assert (missing / "debug_report.md").read_text() == "# Report"
         assert "debug_report.md" in result
+
+    def test_an_unwritable_location_is_reported_not_raised(self, monkeypatch, tmp_path):
+        """
+        A deployed runtime may have a read-only filesystem. The report is a
+        side note to an answer already written, so it must not end the turn.
+        """
+        from agent_app.paths import path_enum
+
+        blocker = tmp_path / "a-file"
+        blocker.write_text("not a directory")
+        monkeypatch.setattr(path_enum, "dir_tmp", blocker)
+        monkeypatch.setattr(path_enum, "path_debug_report_md", blocker / "debug_report.md")
+
+        result = one.tool_write_debug_report(content="# Report")
+        assert result.startswith("Debug report not written")
