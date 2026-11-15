@@ -1,0 +1,42 @@
+# The SQL guardrail rules that depend on the dataset. Content, like the rest of
+# data/: a dataset swap rewrites this file and never touches agent_app/.
+#
+# Which tables and columns exist is not written here: the guardrails read it
+# from the database schema itself, so the allowlist cannot drift from it.
+
+[sensitive]
+# Business contact data the agent may never select, with or without SELECT *.
+columns = [
+    "agency.contact_email",
+    "agency.contact_phone",
+    "advertiser.website_url",
+]
+
+[ratios]
+# Columns that are already shares: AVG of them is unweighted and wrong; they
+# must be weighted by impressions instead.
+share_columns = [
+    "search_impression_share",
+    "search_top_impression_share",
+    "search_lost_is_budget",
+    "search_lost_is_rank",
+]
+
+# The sources of "conversions". A query may use conversions of one source only:
+# they count different things at different grains and never add up.
+# `columns` lists the columns that carry conversions; an empty list means every
+# column of the table does (the table is a conversion event table).
+[[conversion_source]]
+name = "daily_stats"
+label = "engine aggregate (daily_stats.conversions / conversion_value)"
+tables = { daily_stats = ["conversions", "conversion_value"] }
+
+[[conversion_source]]
+name = "conversion"
+label = "Floodlight events (conversion table, and attribution_path built on it)"
+tables = { conversion = [], attribution_path = [], mv_attribution_six_models = [] }
+
+[[conversion_source]]
+name = "search_term_report"
+label = "search term aggregate (search_term_report.conversions)"
+tables = { search_term_report = ["conversions"] }
