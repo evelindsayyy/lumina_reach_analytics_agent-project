@@ -8,8 +8,8 @@
 components/chat/blocks/ 的真实行为调出来的 -- ChartBlock.tsx, MermaidBlock.tsx,
 CodeBlock.tsx, 以及 chart/schema.ts 里那几个上限. 而这个仓库可以跑在小模型上
 (LLM_PROVIDER 可切, Nova Lite 之类的都在支持范围内), 小模型对措辞极其敏感: 仓库
-里已经有一个补丁 (agent_app/agent_debugger.py 的 normalize_render_blocks, 在
-api/index.py 里调用) 专门收拾模型把 chart 包进 <chart> 标签的毛病. 改写这几节等于
+里已经有一个补丁 (agent_app/agent_response.py 的 normalize_render_blocks, 在
+agent_app/runtimes/chat_turn.py 里调用) 专门收拾模型把 chart 包进 <chart> 标签的毛病. 改写这几节等于
 把那个教训重踩一遍.
 
 放在提示词的什么位置: Response Guidelines 之后, Safety 之前.

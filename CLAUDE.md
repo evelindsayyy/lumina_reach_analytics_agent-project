@@ -44,6 +44,13 @@ agent_app/                   # Python package. Name is deliberately generic and
 │   └── dialect.py           #   Snowflake -> DuckDB transpile (sqlglot)
 ├── nl2sql/
 │   └── guardrails.py        #   AST guardrails every agent query passes
+├── runtimes/                # The two AgentCore runtimes; same code locally.
+│   ├── analytics_agent.py   #   HTTP runtime (8080): AI SDK request in, AI SDK
+│   │                        #   v5 stream out; a new agent per turn
+│   ├── chat_turn.py         #   One turn: quota, agent, metering, parse. Pure
+│   ├── analytics_mcp.py     #   MCP runtime (8000, /mcp): the two data tools
+│   ├── mcp_connection.py    #   Local URL, or deployed ARN + SigV4
+│   └── common.py            #   Runtime names, ports, the FastMCP settings
 ├── vendor/                  # Third-party code copied in, not installed.
 │   └── vercel_ai_sdk.py     #   AI SDK request-body data model. No project
 │                            #   logic goes in here.
@@ -58,9 +65,14 @@ agent_app/                   # Python package. Name is deliberately generic and
 │
 └── db_schema/
 
+app/api/chat/route.ts        # The web tier's only backend: forwards to the agent
+                             #   runtime (AGENT_RUNTIME_URL, else 127.0.0.1:8080)
+
 lib/
+├── agent-proxy.ts           # The proxy itself, import-free so tests_node runs it
 ├── icons.ts                 # Icon-name -> component map; exports the IconName type
-├── constants.ts             # Derived view of data/site.toml; authored nothing
+├── utils.ts                 # cn(): Tailwind class merging
+├── seo/                     # <head> metadata, from data/site.toml
 └── site/
     ├── schema.ts            # The shape data/site.toml must have, plus the
     │                        #   required-key list checked at load
@@ -178,7 +190,7 @@ in a component.
 | Agent's domain knowledge | `data/system-prompt.md` |
 | SQL guardrail rules (sensitive / share columns, conversion sources) | `data/sql-policy.toml` |
 | The data itself | `dataset/` — source docs plus the generator that builds `<name>.duckdb` |
-| Dataset-specific write tools | `@tool` methods in `one_04_agent.py` |
+| Dataset-specific write tools | `@mcp.tool()` functions in `runtimes/analytics_mcp.py` |
 
 The only entry not in `data/` is the last one, because a write tool is code.
 
@@ -206,7 +218,7 @@ the build too, since the check script never parses the TOML's icon fields.
 |------|--------------|----------------|
 | `api.py` | Re-exports `one` singleton | Rarely. Only if you need to expose additional top-level imports. |
 | `paths.py` | Defines all file/directory paths as `PathEnum`, including the system prompt | When adding new files (prompts, data files, output paths). Add path here first, then use `path_enum.your_new_path` everywhere. Paths are source-tree facts, so they are never named in config. Never add one speculatively: an entry with no reader rots into a pointer at a directory that no longer exists. |
-| `runtime.py` | Detects runtime environment (local vs vercel) | When adding a new deployment target (e.g., AWS Lambda). Add new enum value and detection logic. |
+| `runtime.py` | Detects runtime environment (local vs vercel). Only the Python processes read it, and since M2b none runs on Vercel | When adding a new deployment target (e.g., AWS Lambda). Add new enum value and detection logic. |
 | `constants.py` | Shared enums: the LLM provider list, and the schema-encoding vocabulary | When adding an enum a *second* module needs. A constant with one reader belongs next to that reader, not here. |
 | `utils.py` | Helpers with no project dependencies: `debug` (stderr, never stdout) and `match` (include/exclude patterns) | Same rule as `constants.py` — only what a *second* module needs. |
 | `sql_utils.py` | Pure functions for SQL execution and formatting. Owns one promise: a query run through `execute_sql_query` cannot change the database | When changing how SQL results are formatted. Every failure is *returned as text*, never raised — the caller is an LLM, and a traceback ends its turn. |
@@ -230,7 +242,7 @@ the build too, since the check script never parses the TOML's icon fields.
 | `one_01_config.py` | `ConfigMixin`: provides `self.config` | Rarely. Config loading logic is in `config.py`. |
 | `one_02_db.py` | `DbMixin`: provides `self.engine` (chosen by `WAREHOUSE_ENGINE`), `self.db_type`, `self.reflected_metadata` (tables and views), `self.database_schema_str`, `self.guardrail_policy`, `self.execute_sql_query` | When changing engine selection or the guardrails -> transpile -> execute pipeline. |
 | `one_03_boto3.py` | `Boto3Mixin`: provides `self.boto_ses`, `self.bedrock_runtime_client()` | When adding new AWS service clients (S3, DynamoDB, etc.). |
-| `one_04_agent.py` | `AgentMixin`: provides `self.agent` and all `@tool` methods | **Most common edit.** When adding/modifying agent tools. Add `@tool` method here, then register in `self.agent`'s `tools=[]` list. |
+| `one_04_agent.py` | `AgentMixin`: provides `self.model` (the strands model of `LLM_PROVIDER`) and the agent's own `tool_write_debug_report` | When adding an LLM provider. Data tools are not here: they are on the MCP server, `runtimes/analytics_mcp.py` |
 | `api.py` | Exports `one = One()` singleton | Rarely. Only touched when restructuring exports. |
 
 **data/ Directory (everything a dataset swap rewrites):**
@@ -282,12 +294,46 @@ One (one_00_main.py)
 │
 └── AgentMixin (one_04_agent.py)
     ├── self.bedrock_model         -> BedrockModel (strands)
-    ├── self.agent                 -> Agent with tools
-    └── @tool methods:
-        ├── tool_get_database_schema
-        ├── tool_execute_sql_query
-        └── tool_write_debug_report
+    ├── self.model                 -> the strands model of LLM_PROVIDER
+    └── tool_write_debug_report    -> the agent's own tool (returns, never raises)
 ```
+
+There is no `one.agent`. The agent is built per request in
+`runtimes/analytics_agent.py` (`build_agent`): `one.model`, the system prompt,
+the history the client sent, and two tool sources -- an `MCPClient` of the
+`AnalyticsMcp` runtime and `one.tool_write_debug_report`.
+
+### The Two Runtimes
+
+```
+Browser -> Next.js /api/chat (proxy) -> AnalyticsAgent :8080 -> MCP -> AnalyticsMcp :8000 -> warehouse
+```
+
+| | `AnalyticsAgent` | `AnalyticsMcp` |
+|---|---|---|
+| Module | `runtimes/analytics_agent.py` | `runtimes/analytics_mcp.py` |
+| AgentCore contract | HTTP: `POST /invocations`, `GET /ping`, port 8080 | MCP: stateless streamable HTTP, `/mcp`, port 8000 |
+| Server | `BedrockAgentCoreApp` | `FastMCP` |
+| Reads | `LLM_PROVIDER` and its key | the warehouse (DuckDB file or Snowflake key) |
+| Never | opens a warehouse connection | calls a model |
+
+- **Request and response are the AI SDK's.** The agent runtime takes the
+  request body the UI posts and returns the v5 UI message stream (a Starlette
+  `StreamingResponse`, which `BedrockAgentCoreApp` passes through), so the web
+  tier forwards both without parsing.
+- **A new agent per turn** (`chat_turn.run_chat_turn`). The UI resends the
+  conversation each time, so nothing is cached between requests, and two chats
+  cannot see each other's messages. Metering reads the fresh agent's
+  `accumulated_usage`, which is therefore exactly the turn's.
+- **Every failure is an answer, not a 500**: no message, spent quota, MCP
+  unreachable, model throttled or failed. Each is a sentence in
+  `agent_response.py` / `chat_turn.py`; the details go to the log.
+- **Retries are capped** (`MODEL_RETRY_STRATEGY`: three attempts, about six
+  seconds). The strands default spent two minutes retrying a daily token cap.
+- **Finding the MCP server**: `MCP_URL_ANALYTICSMCP` (set by `mise run dev`),
+  else `AGENTCORE_RUNTIME_ANALYTICSMCP_ARN`, which the AgentCore CLI's
+  `bind()` sets on a deployed agent; then every request is SigV4-signed with
+  the agent's execution role.
 
 ### Pure Functions vs Bound Methods
 
@@ -297,8 +343,8 @@ One (one_00_main.py)
 | **Bound Methods** | `one/one_*.py` | Use `self.config`, `self.engine`, etc. |
 
 **Write operations:** none ship by default. They are inherently dataset
-specific, so a dataset that needs them adds `@tool` methods in `one_04_agent.py`
-and registers them in the agent's `tools=[]` list. Keep the underlying helpers
+specific, so a dataset that needs them adds `@mcp.tool()` functions in
+`runtimes/analytics_mcp.py`, where the warehouse connection is. Keep the underlying helpers
 pure — `engine` as the first parameter, returning a dict — the way `sql_utils.py`
 does.
 
@@ -328,7 +374,7 @@ one.config.warehouse_engine            # WAREHOUSE_ENGINE: "duckdb" | "snowflake
 
 - **Library**: `strands` (Strands Agents SDK)
 - **Model**: AWS Bedrock (configurable via `config.model_id`)
-- **Tools**: Defined with `@tool` decorator in `one_04_agent.py`
+- **Tools**: the data tools are `@mcp.tool()` functions in `runtimes/analytics_mcp.py`; the agent's own tool is `tool_write_debug_report` in `one_04_agent.py`
 - **System Prompt**: `data/system-prompt.md`
 
 ---
@@ -412,6 +458,11 @@ tests_python/
 │   └── test_nl2sql_guardrails.py   # Tests for guardrails.py (fictional acme policy)
 ├── warehouse/
 │   └── test_warehouse_engines.py   # Tests for engines.py and dialect.py
+├── runtimes/
+│   ├── test_runtimes_analytics_mcp.py   # Data tools, direct and over an in-memory MCP session
+│   ├── test_runtimes_analytics_agent.py # HTTP contract via Starlette's TestClient, agent stubbed
+│   ├── test_runtimes_chat_turn.py       # One turn with a stub agent: answers, refusals, failures
+│   └── test_runtimes_mcp_connection.py  # Local URL vs ARN + SigV4
 ├── one/
 │   ├── test_one_one_00_main.py     # Tests for One class
 │   ├── test_one_one_01_config.py   # Tests for ConfigMixin
@@ -439,7 +490,7 @@ this dataset's real table names. A test asserting on `campaign` silently becomes
 a lie the next time the dataset is swapped.
 
 **Node.js Tests:**
-- Location: `tests_node/`
+- Location: `tests_node/` (`*.test.mjs`; Node 24 strips the types of `lib/agent-proxy.ts` itself)
 - Runner: Node's built-in test module
 - Command: `mise run test-node`
 
@@ -457,7 +508,8 @@ a lie the next time the dataset is swapped.
 - `mise run test` - Run all tests (content consistency + Python + Node.js)
 - `mise run cov` - Run tests with a coverage report, written to `htmlcov/`
 - `mise run export` - Export Python requirements to requirements.txt
-- `mise run dev` - Start all development servers (Next.js + FastAPI, auto-kills this project's old instances first)
+- `mise run dev` - Start all development servers (Next.js on 3000, agent runtime on 8080, MCP runtime on 8000; auto-kills this project's old instances first)
+- `mise run agent-dev` / `mise run mcp-dev` - Start one runtime alone
 - `mise run kill` - Kill this project's development servers
 - `mise run build-web` - Build the Next.js frontend; the only check for `site.toml` keys and icon names
 - `mise run gen-data` - Build `dataset/<name>.duckdb` from the dataset's generator (= `agent-app gen-data`; replaces any existing `.duckdb` file)
@@ -523,8 +575,9 @@ One notification, arriving in seconds:
 until grep -q "Ready in" <task-output-file>; do sleep 0.5; done
 ```
 
-Both halves have to be up, and they log different lines: Next.js prints
-`Ready in`, uvicorn prints `Application startup complete.`. Next.js runs as
+All three have to be up, and they log different lines: Next.js prints
+`Ready in`, the agent prints `serving on port 8080`, the MCP runtime prints
+`Uvicorn running on http://127.0.0.1:8000`. Next.js runs as
 `next dev --webpack` (Turbopack's dev server cannot resolve the multi-parameter
 `next/font/google` URL in `app/layout.tsx`; see the comment in `mise.toml`), and
 `next.config.js` pins `turbopack.root` to this repo so a stray lockfile further

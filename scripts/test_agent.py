@@ -1,15 +1,43 @@
 # -*- coding: utf-8 -*-
 
 """
-Test script for the BI Agent.
+Ask the local agent runtime one question, without the browser.
 
-Usage:
+Usage (with ``mise run dev`` running, or at least the agent and MCP runtimes):
     .venv/bin/python scripts/test_agent.py
 
-Change the `request` variable at the bottom to test different queries.
+Change the `request` variable at the bottom to test different queries. The
+script posts the same AI SDK request the chat UI posts, and prints the reply.
 """
 
-from agent_app.one.api import one
+import json
+import urllib.request
+
+AGENT_URL = "http://127.0.0.1:8080/invocations"
+
+
+def ask(question: str) -> None:
+    """POST ``question`` to the agent runtime and print the reasoning and answer."""
+    body = {
+        "id": "test-agent",
+        "trigger": "submit-message",
+        "messages": [
+            {"id": "m1", "role": "user", "parts": [{"type": "text", "text": question}]}
+        ],
+    }
+    req = urllib.request.Request(
+        AGENT_URL,
+        data=json.dumps(body).encode("utf-8"),
+        headers={"content-type": "application/json"},
+    )
+    with urllib.request.urlopen(req, timeout=300) as response:
+        for line in response.read().decode("utf-8").splitlines():
+            if not line.startswith("data: ") or line == "data: [DONE]":
+                continue
+            event = json.loads(line[len("data: "):])
+            if event.get("type") in ("reasoning-delta", "text-delta"):
+                print(f"--- {event['type']}\n{event['delta']}\n")
+
 
 # =============================================================================
 # Test Requests - Onboarding & System Understanding (1-3)
@@ -93,4 +121,4 @@ request = request_01
 # request = request_09
 # request = request_10
 
-one.agent(request)
+ask(request)

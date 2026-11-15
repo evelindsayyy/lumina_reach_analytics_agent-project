@@ -16,15 +16,31 @@ tables, charts or diagrams, plus the SQL it ran.
 ```mermaid
 flowchart LR
     U[Browser] --> N[Next.js chat UI<br/>AI SDK v5]
-    N --> F[FastAPI /api/chat]
-    F --> A[Strands agent]
-    A -- get_database_schema --> W[(Warehouse)]
-    A -- execute_sql_query --> G{SQL guardrails<br/>sqlglot AST}
-    G -- rejected, with a code --> A
+    N -- /api/chat<br/>thin proxy --> A[AnalyticsAgent runtime<br/>Strands agent, HTTP :8080]
+    A -- MCP --> M[AnalyticsMcp runtime<br/>FastMCP :8000]
+    M -- execute_sql_query --> G{SQL guardrails<br/>sqlglot AST}
+    G -- rejected, with a code --> M
     G -- passed --> T[Transpile Snowflake to DuckDB<br/>locally only]
     T --> R[Always rolled-back,<br/>read-only transaction]
-    R --> W
+    R --> W[(Warehouse)]
+    M -- get_database_schema --> W
 ```
+
+Three processes, each with one job, and the same three run locally and on
+[Amazon Bedrock AgentCore](https://aws.amazon.com/bedrock/agentcore/):
+
+- **Web tier** (`app/api/chat/route.ts`, `lib/agent-proxy.ts`): forwards the
+  chat request to the agent runtime and streams the answer back untouched. No
+  Python and no credentials; an unreachable runtime becomes a readable answer.
+- **Agent runtime** (`agent_app/runtimes/analytics_agent.py`): the AgentCore
+  HTTP contract (`POST /invocations`, `GET /ping` on 8080). It takes the AI SDK
+  request, builds a new agent for each turn from the history the client sends
+  (no shared state between users), and answers in the AI SDK v5 UI message
+  stream. It never opens a warehouse connection.
+- **MCP runtime** (`agent_app/runtimes/analytics_mcp.py`): the AgentCore MCP
+  contract (stateless streamable HTTP on 8000, `/mcp`), serving
+  `get_database_schema` and `execute_sql_query`. The only process that holds
+  warehouse credentials. Deployed, the agent signs its MCP calls with SigV4.
 
 - **Warehouse:** a DuckDB file locally, for development, tests and evaluation;
   Snowflake when deployed (key-pair service user with a read-only role).
@@ -80,8 +96,11 @@ Requires [mise](https://mise.jdx.dev/) (it installs Python, Node.js, uv and pnpm
 mise run inst            # Python and Node.js dependencies
 mise run gen-data        # build dataset/lumina_reach_paid_search.duckdb
 mise run cli-check-content
-mise run dev             # http://localhost:3000
+mise run dev             # http://localhost:3000, plus the agent (8080) and MCP (8000) runtimes
 ```
+
+`scripts/test_agent.py` asks the running agent runtime a question without the
+browser.
 
 The LLM provider is set by `LLM_PROVIDER` (`bedrock`, `anthropic`, `openai` or
 `google`). The committed default is Bedrock. To use the Anthropic API, put this
@@ -95,8 +114,9 @@ ANTHROPIC_API_KEY="..."
 ## Tests
 
 ```bash
-mise run test-python     # 312 tests
+mise run test-python     # 335 tests
 mise run cov-python      # 99% line coverage of agent_app
+mise run test-node       # the web tier's proxy
 mise run build-web       # also validates data/site.toml against the UI
 ```
 
@@ -108,12 +128,12 @@ guardrails rather than any one domain.
 | Milestone | Scope | Status |
 | :--- | :--- | :--- |
 | M2a | the app on Lumina Reach data: DuckDB/Snowflake engines, guardrails, prompt, UI | done |
-| M2b | split the agent and its tools: the agent as an AgentCore HTTP runtime, `get_database_schema` / `execute_sql_query` as an MCP server runtime | next |
-| M2c | deploy on Amazon Bedrock AgentCore: per-runtime IAM roles, Cognito JWT login forwarded from the UI, Snowflake key in SSM readable only by the MCP role, per-user quota | planned |
+| M2b | split the agent and its tools: the agent as an AgentCore HTTP runtime, `get_database_schema` / `execute_sql_query` as an MCP server runtime, `/api/chat` as a thin proxy | done |
+| M2c | deploy on Amazon Bedrock AgentCore: per-runtime IAM roles, Cognito JWT login forwarded from the UI, Snowflake key in SSM readable only by the MCP role, per-user quota | next |
 | M2d | evaluation: golden set from Q1–Q20 plus held-out paraphrases, result-level comparison on several seeds | planned |
 
 ## Credits
 
-The app skeleton (Next.js chat UI, FastAPI entry point, Strands agent wiring,
+The app skeleton (Next.js chat UI, Strands agent wiring,
 render blocks, content checks) started from
 [learn_ba_agent_app_scaffold-project](https://github.com/evelindsayyy/learn_ba_agent_app_scaffold-project).

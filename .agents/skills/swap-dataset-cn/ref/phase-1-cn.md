@@ -74,8 +74,8 @@ grep -n "^LLM_PROVIDER" .env.defaults                           # 默认走哪�
 | `bedrock` | 没有现成脚本. 它不走 API key, 用 `~/.aws/credentials` 或者 IAM 角色 |
 
 **最后确认开发服务器能起来.** `mise run dev` 永远不会自己退出, 所以后台起, 另开一个会自己
-退出的循环去等两个就绪标记 (Next.js 打 `Ready in`, uvicorn 打 `Application startup
-complete.`), 看到之后立刻 `TaskStop` 停掉:
+退出的循环去等三个就绪标记 (Next.js 打 `Ready in`, agent 打 `serving on port 8080`,
+MCP 打 `Uvicorn running on http://127.0.0.1:8000`), 看到之后立刻 `TaskStop` 停掉:
 
 ```bash
 until grep -q "Ready in" <task-output-file> \
