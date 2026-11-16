@@ -69,6 +69,11 @@ test("the replay says it is a recording, from when, and how to ask live", () => 
   assert.match(note, /own question/);
 });
 
+test("an answer re-recorded on its own carries its own date", () => {
+  const note = demoNote(DEMOS, { ...DEMOS.answers[0], recordedAt: "2026-11-20" });
+  assert.match(note, /2026-11-20/);
+});
+
 test("the replay is a complete UI message stream: reasoning, then the answer in pieces", () => {
   const events = payloads(demoStreamEvents(DEMOS.answers[0], DEMOS, 10));
   const types = events.map((e) => (typeof e === "string" ? e : e.type));

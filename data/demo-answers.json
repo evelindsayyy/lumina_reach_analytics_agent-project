@@ -1,5 +1,126 @@
 {
-  "recordedAt": "",
-  "model": "",
-  "answers": []
+  "recordedAt": "2026-11-16",
+  "model": "claude-haiku-5-5",
+  "answers": [
+    {
+      "title": "Introduction",
+      "question": "What can you help me analyze? Give me a short tour of the portfolio and the kinds of questions you answer well.",
+      "reasoning": "",
+      "answer": "Here's the portfolio as of the data end date, 2026-07-13.\n\n**Portfolio snapshot**\n- **80 advertisers** across **10 industries**, with 8 advertisers in each industry (Healthcare, Financial Services, Real Estate, Travel, Restaurants, Auto, Retail, Insurance, Education, B2B SaaS).\n- **144 engine accounts** (Google Ads and Microsoft Advertising), **1,024 campaigns**.\n- **15 agencies** across four tiers. **58 advertisers** have an active agency engagement; the other 22 are self-managed.\n- **$20.48M** of spend in the 30 days to 2026-07-13 (engine aggregate).\n\n**Questions I answer well**\n- **Efficiency:** CPA, ROAS, CTR, CPC and conversion rate, with a breakdown of why CPA moved (CPC or conversion rate).\n- **Engines and devices:** Google vs Microsoft, and Mobile vs Desktop vs Tablet.\n- **Budget and bidding:** which campaigns are pacing hard against budget, and which Target CPA campaigns miss their target.\n- **Impression share:** budget-limited Search campaigns, and top-of-page share by engine.\n- **Keyword and search term waste:** zero-conversion keywords, low quality score keywords, broad-match overflow, and wasteful search terms.\n- **Attribution:** how channels open and close paths, path length, time to conversion, and channel value under six models. The data-driven model is a non-production simulation, so I treat it as illustrative only.\n- **Agencies:** which agency and tier manage the top advertisers, and how the book spreads across tiers.\n- **Trends:** daily spend, conversions and CPA.\n\nEach conversion answer names its source. Engine aggregate figures cover campaign, engine and device efficiency. Floodlight events cover channels and attribution. The search term aggregate covers keyword waste. I don't add these sources together.\n\nGood starting questions: \"Which Target CPA campaigns miss their target, and by how much?\" or \"How do Display and Paid Search compare under first-click and last-click?\"",
+      "seconds": 24.6,
+      "inputTokens": 21279,
+      "outputTokens": 2133,
+      "recordedAt": "2026-11-16"
+    },
+    {
+      "title": "Attribution Gap",
+      "question": "For each channel, give me the conversion value it earns under last-click and under first-click attribution. Show it as a bar chart with one series for each model, then say in one line which channels last-click under-credits.",
+      "reasoning": "",
+      "answer": "```chart\n{\n  \"type\": \"bar\",\n  \"title\": \"Floodlight conversion value by channel: last-click vs first-click\",\n  \"yLabel\": \"USD thousands\",\n  \"categories\": [\"Paid Search\", \"Display\", \"Paid Social\", \"Organic Search\", \"Email\", \"Direct\"],\n  \"series\": [\n    { \"name\": \"last_click\", \"values\": [1351.75, 62.22, 111.27, 251.60, 170.61, 164.19] },\n    { \"name\": \"first_click\", \"values\": [450.39, 643.74, 550.89, 269.89, 119.66, 77.07] }\n  ]\n}\n```\n\nLast-click under-credits Display, Paid Social and, marginally, Organic Search.\n\nSource: Floodlight events (`mv_attribution_six_models`), covering the Floodlight window ending 2026-07-13. Values in USD.",
+      "seconds": 22.7,
+      "inputTokens": 6850,
+      "outputTokens": 1792,
+      "recordedAt": "2026-11-16"
+    },
+    {
+      "title": "Account Structure",
+      "question": "Count the advertisers, engine accounts, campaigns, ad groups and keywords in the portfolio, and trace how each level contains the next. Put the count on each level. Show it as a flowchart.",
+      "reasoning": "",
+      "answer": "The portfolio has 80 advertisers, 144 engine accounts, 1,024 campaigns, 4,621 ad groups and 33,399 keywords. Every level sits fully under the one above it: no advertiser lacks an engine account, no account lacks a campaign, and no campaign lacks an ad group.\n\n```mermaid\nflowchart TD\n    A[\"Advertisers: 80\"] -->|\"1.8 engine accounts each\"| B[\"Engine accounts: 144\"]\n    B -->|\"7.1 campaigns each\"| C[\"Campaigns: 1,024\"]\n    C -->|\"4.5 ad groups each\"| D[\"Ad groups: 4,621\"]\n    D -->|\"7.2 keywords each\"| E[\"Keywords: 33,399\"]\n```\n\nEach ratio is the count below divided by the count above, so it is an average across the portfolio. Those ratios are plain counts, not performance metrics.\n\nOne gap: 460 ad groups (about 10%) have no keyword. They are still counted in the ad-group total, and their campaigns are fully covered by the hierarchy.\n\nThe counts come from the base tables with no date window, so they describe the whole portfolio, including any paused or inactive items. Engine accounts are counted directly, not through agency or status filters.",
+      "seconds": 23.1,
+      "inputTokens": 10132,
+      "outputTokens": 1936,
+      "recordedAt": "2026-11-16"
+    },
+    {
+      "title": "Budget Pacing",
+      "question": "Over the last 7 days, list the ten campaigns with the highest pacing. Give me the campaign name, spend, the budget in effect, and pacing. Show it as a Markdown table, and show the SQL you ran.",
+      "reasoning": "",
+      "answer": "Over the 7 days ending 2026-07-13, the ten campaigns spending furthest ahead of their budgets were all Search campaigns running 7% to 13% over. Pacing is total spend divided by the sum of the daily budgets in effect for each day.\n\n| Campaign | Spend (7d) | Budget in effect (7d) | Pacing |\n|:---|---:|---:|---:|\n| Silver Path Co Search 01 | $8,139.82 | $7,218.75 | 112.76% |\n| Harbor Labs Co Search 04 | $17,004.68 | $15,383.06 | 110.54% |\n| Crescent Gate Co Search 03 | $3,741.36 | $3,391.99 | 110.30% |\n| Cedar Haven Co Search 05 | $12,699.97 | $11,540.76 | 110.04% |\n| Harbor Line Co Search 03 | $20,366.35 | $18,709.56 | 108.86% |\n| Harbor Stone Co Search 01 | $17,012.19 | $15,730.75 | 108.15% |\n| Lake Labs Co Search 05 | $5,552.05 | $5,152.00 | 107.76% |\n| Union Grove Co Search 02 | $7,017.01 | $6,518.33 | 107.65% |\n| Pioneer Field Co Search 05 | $12,464.42 | $11,595.78 | 107.49% |\n| Crescent Labs Co Search 04 | $5,061.94 | $4,709.25 | 107.49% |\n\nHarbor Line Co Search 03 has the largest overspend in dollars, at about $1,657 above its budget. Silver Path Co Search 01 has the highest pacing ratio, but it is one of the smaller campaigns.\n\nThe spend comes from the engine aggregate (`daily_stats.cost`). The window covers report dates 2026-07-07 through 2026-07-13.\n\nThe first query failed because Snowflake rejected a correlated subquery. I rewrote the budget lookup as a join that keeps the latest budget version on or before each day. The query below is the one that produced the table.\n\n```sql\nWITH campaign_day AS (\n    SELECT ds.campaign_id, ds.report_date, SUM(ds.cost) AS cost\n    FROM daily_stats ds\n    CROSS JOIN v_reference_date r\n    WHERE ds.report_date > DATEADD(day, -7, r.reference_date)\n      AND ds.report_date <= r.reference_date\n    GROUP BY ds.campaign_id, ds.report_date\n), budget_in_effect AS (\n    SELECT cd.campaign_id, cd.report_date, cb.daily_budget\n    FROM campaign_day cd\n    JOIN campaign_budget cb\n      ON cb.campaign_id = cd.campaign_id\n     AND cb.effective_date <= cd.report_date\n    QUALIFY ROW_NUMBER() OVER (PARTITION BY cd.campaign_id, cd.report_date\n                               ORDER BY cb.effective_date DESC) = 1\n), with_budget AS (\n    SELECT cd.campaign_id, cd.cost, be.daily_budget\n    FROM campaign_day cd\n    LEFT JOIN budget_in_effect be\n      ON be.campaign_id = cd.campaign_id\n     AND be.report_date = cd.report_date\n)\nSELECT c.campaign_name,\n       ROUND(SUM(wb.cost), 2) AS spend_7d,\n       ROUND(SUM(wb.daily_budget), 2) AS budget_in_effect_7d,\n       ROUND(SUM(wb.cost) / NULLIF(SUM(wb.daily_budget), 0), 4) AS pacing_pct\nFROM with_budget wb\nJOIN campaign c ON c.campaign_id = wb.campaign_id\nGROUP BY c.campaign_id, c.campaign_name\nORDER BY pacing_pct DESC\nLIMIT 10\n```\n\nOne caveat: a campaign-day with no budget version yet in effect adds spend but no budget, which would inflate its pacing. I did not check whether any of these ten campaigns has that case.",
+      "seconds": 32.8,
+      "inputTokens": 13498,
+      "outputTokens": 4399,
+      "recordedAt": "2026-11-16"
+    },
+    {
+      "title": "Engine Choice",
+      "question": "Over the last 30 days, compare Google Ads and Microsoft Advertising on cost per click, conversion rate and CPA. Explain why the CPAs end up where they do, and say whether that is a reason to shift budget.",
+      "reasoning": "",
+      "answer": "**Short answer:** Microsoft Advertising has a lower CPA, but the gap is small (about 5%). It is not enough on its own to justify moving budget from Google.\n\n**Engine comparison, last 30 days (to 2026-07-13, engine aggregate conversions)**\n\n| Metric | Google Ads | Microsoft Advertising |\n| :--- | ---: | ---: |\n| Spend | $13.03M | $7.45M |\n| Clicks | 5.94M | 4.06M |\n| CPC | $2.19 | $1.83 |\n| CTR | 3.74% | 3.74% |\n| Conversion rate | 4.32% | 3.81% |\n| CPA | $50.85 | $48.16 |\n\n**Why the CPAs land where they do**\n\nCPA is CPC divided by conversion rate. Microsoft's clicks cost 16% less, but they convert about 12% less often. The two effects nearly cancel, so the CPA gap is only about $2.70.\n\nCTR is identical on both engines, so the difference is not in who clicks. It is in what each click costs and whether it converts.\n\nThe mix is not the cause. Search makes up about 87–88% of spend on both engines. Comparing only the 64 advertisers that run on both engines gives the same picture: Google $51.21 CPA, Microsoft $48.16.\n\n**Where the pattern reverses**\n- **Search:** Microsoft is cheaper ($48.02 vs $51.44 CPA).\n- **Display:** Microsoft is cheaper ($45.73 vs $51.60).\n- **Shopping:** Microsoft is more expensive ($53.48 vs $45.55). Its CPC is similar, but its conversion rate is lower (3.68% vs 4.25%).\n\n**Should budget shift?**\n\nNot on this evidence alone. Three reasons:\n1. The blended gap is about 5%, and average CPA is not the same as the CPA of the next dollar.\n2. Microsoft has about 32% fewer impressions than Google. Adding spend there could push its CPC up, which would erase the advantage.\n3. Each engine reports its own conversions, so the two CPAs are not a perfectly common yardstick.\n\nA reasonable next step is a controlled Search test that moves a modest amount of budget to Microsoft and tracks marginal CPA. Shopping should not move toward Microsoft based on this data.\n\nSource: engine aggregate (`daily_stats.conversions`). I did not use Floodlight conversions here, since this is an engine efficiency question. A debug report has been written.",
+      "seconds": 35.2,
+      "inputTokens": 15568,
+      "outputTokens": 5032,
+      "recordedAt": "2026-11-16"
+    },
+    {
+      "title": "CPA Trend",
+      "question": "Give me the CPA for each of the last 21 days. Show it as a line chart, then say in one line whether CPA is improving or getting worse.",
+      "reasoning": "",
+      "answer": "```chart\n{\n  \"type\": \"line\",\n  \"title\": \"Daily CPA, 2026-06-23 to 2026-07-13 (engine aggregate)\",\n  \"yLabel\": \"CPA (USD)\",\n  \"categories\": [\"06-23\", \"06-24\", \"06-25\", \"06-26\", \"06-27\", \"06-28\", \"06-29\", \"06-30\", \"07-01\", \"07-02\", \"07-03\", \"07-04\", \"07-05\", \"07-06\", \"07-07\", \"07-08\", \"07-09\", \"07-10\", \"07-11\", \"07-12\", \"07-13\"],\n  \"series\": [\n    { \"name\": \"CPA\", \"values\": [50.30, 49.40, 49.88, 49.51, 49.52, 50.31, 50.52, 49.73, 49.93, 49.62, 50.12, 49.84, 50.08, 49.54, 49.17, 49.90, 49.96, 49.69, 50.77, 49.96, 50.02] }\n  ]\n}\n```\n\nSource: engine aggregate (`daily_stats`), window ending 2026-07-13. The daily CPA stays between $49.17 and $50.77.\n\n**Verdict: CPA is flat, neither improving nor worsening.** The last 7 days average $49.90, against $49.87 for the prior 14 days.",
+      "seconds": 25.1,
+      "inputTokens": 11744,
+      "outputTokens": 1836,
+      "recordedAt": "2026-11-16"
+    },
+    {
+      "title": "Smart Bidding Audit",
+      "question": "Over the last 30 days, list the campaigns on a Target CPA strategy whose actual CPA is above target. Give me the campaign name, target CPA, actual CPA, and how far over target they are. Show it as a Markdown table, and show the SQL you ran.",
+      "reasoning": "",
+      "answer": "**102 of the 118 Target CPA campaigns with spend in the last 30 days ran above their target CPA.** The table shows the 20 furthest over target, ranked by how far over they are. Window: 2026-06-13 to 2026-07-13. Conversions come from the engine aggregate (`daily_stats`).\n\n| Campaign | Target CPA (USD) | Actual CPA (USD) | Over target |\n|:--|--:|--:|--:|\n| Silver Path Co Search 07 | 2.82 | 27.89 | +889% |\n| Silver Path Co Search 01 | 2.82 | 22.34 | +692% |\n| North Crest Co Search 05 | 3.64 | 27.48 | +651% |\n| Silver Path Co Display 02 | 2.82 | 19.86 | +604% |\n| Silver Path Co Search 06 | 2.82 | 19.26 | +583% |\n| Bright Line Co Search 04 | 4.17 | 27.84 | +568% |\n| Silver Path Co Display 04 | 2.82 | 18.53 | +557% |\n| Silver Works Co Shopping 05 | 21.88 | 140.55 | +542% |\n| North Crest Co Search 06 | 3.64 | 22.96 | +531% |\n| Bright Line Co Display 03 | 4.17 | 26.21 | +529% |\n| Silver Path Co Search 06 | 2.82 | 17.58 | +523% |\n| Lake Haven Co Search 03 | 3.85 | 23.50 | +510% |\n| Lake Haven Co Shopping 02 | 3.85 | 22.61 | +487% |\n| Silver Works Co Search 03 | 21.88 | 128.41 | +487% |\n| Silver Works Co Search 02 | 21.88 | 128.08 | +485% |\n| Summit Stone Co Search 03 | 26.05 | 140.46 | +439% |\n| Silver Works Co Shopping 02 | 21.88 | 117.75 | +438% |\n| Lake Haven Co Shopping 01 | 3.85 | 20.64 | +436% |\n| Summit Stone Co Search 06 | 26.05 | 136.43 | +424% |\n| Silver Works Co Search 06 | 21.88 | 114.56 | +424% |\n\nNotes:\n- Two campaigns are both named \"Silver Path Co Search 06\". They are different campaign rows, so the name alone does not identify one.\n- The gaps are very large. Some campaigns are at 5 to 9 times their target. Several Silver Path, North Crest, Bright Line and Lake Haven campaigns have targets under $5, while the Silver Works and Summit Stone targets are above $20. I have not checked whether those targets are set correctly.\n\nSQL run:\n\n```sql\nWITH camp AS (\n    SELECT c.campaign_id,\n           c.campaign_name,\n           bs.target_cpa,\n           SUM(ds.cost) AS cost,\n           SUM(ds.conversions) AS conversions\n    FROM campaign c\n    JOIN bid_strategy bs ON bs.bid_strategy_id = c.bid_strategy_id\n    JOIN bid_strategy_type bst ON bst.bid_strategy_type_id = bs.bid_strategy_type_id\n    JOIN daily_stats ds ON ds.campaign_id = c.campaign_id\n    CROSS JOIN v_reference_date r\n    WHERE bst.type_name = 'Target CPA'\n      AND bs.target_cpa IS NOT NULL\n      AND ds.report_date > DATEADD(day, -30, r.reference_date)\n      AND ds.report_date <= r.reference_date\n    GROUP BY c.campaign_id, c.campaign_name, bs.target_cpa\n)\nSELECT campaign_name,\n       ROUND(target_cpa, 2) AS target_cpa,\n       ROUND(cost / NULLIF(conversions, 0), 2) AS actual_cpa,\n       ROUND((cost / NULLIF(conversions, 0)) / target_cpa - 1, 4) AS over_target_pct\nFROM camp\nWHERE cost / NULLIF(conversions, 0) > target_cpa\nORDER BY over_target_pct DESC\nLIMIT 20\n```",
+      "seconds": 29.7,
+      "inputTokens": 13404,
+      "outputTokens": 3890,
+      "recordedAt": "2026-11-16"
+    },
+    {
+      "title": "Where Search Spend Goes",
+      "question": "Over the last 30 days, split search term spend into spend matched to a keyword and broad-match overflow, then split each into spend with and without conversions. Put the dollar amount on each step. Show it as a flowchart.",
+      "reasoning": "",
+      "answer": "Over the 30 days ending 2026-07-13, search term spend totaled **$1,168,922.28**. Almost all of it sits on terms that converted, and zero-conversion waste is small.\n\n```mermaid\nflowchart TD\n    A[\"Total search term spend<br/>$1,168,922.28\"] --> B[\"Matched to a keyword<br/>$1,025,494.02\"]\n    A --> C[\"Broad-match overflow<br/>$143,428.26\"]\n    B --> D[\"With conversions<br/>$1,018,589.52\"]\n    B --> E[\"No conversions<br/>$6,904.50\"]\n    C --> F[\"With conversions<br/>$135,045.74\"]\n    C --> G[\"No conversions<br/>$8,382.52\"]\n```\n\n- **Keyword-matched:** 87.7% of total spend. Only $6,904.50 (0.7% of this branch) sits on terms with no conversions.\n- **Broad-match overflow:** 12.3% of total spend. $8,382.52 (5.8% of this branch) sits on terms with no conversions, a higher share than keyword-matched spend.\n- **Zero-conversion waste:** $15,287 in total, about 1.3% of spend.\n\nConversions come from the search term aggregate (`search_term_report.conversions`). A term counts as converting if its summed conversions over the window are above zero. The split reconciles: the two branches add to the total, and each pair of conversion states adds to its branch.",
+      "seconds": 26.8,
+      "inputTokens": 10992,
+      "outputTokens": 3010,
+      "recordedAt": "2026-11-16"
+    },
+    {
+      "title": "Device Efficiency",
+      "question": "Over the last 30 days, give me the CPA for Mobile, Desktop and Tablet. Show it as a bar chart, then say in one line how the share of impressions compares with the CPA.",
+      "reasoning": "",
+      "answer": "Over the last 30 days (2026-06-14 to 2026-07-13, engine aggregate), Desktop is the cheapest device per conversion and Mobile is the most expensive, though it takes the largest share of impressions.\n\n```chart\n{\n  \"type\": \"bar\",\n  \"title\": \"CPA by device, last 30 days (engine aggregate)\",\n  \"yLabel\": \"CPA (USD)\",\n  \"categories\": [\"Desktop\", \"Tablet\", \"Mobile\"],\n  \"series\": [\n    { \"name\": \"CPA\", \"values\": [37.90, 50.04, 67.54] }\n  ]\n}\n```\n\n| Device | Cost | Conversions | CPA | Impression share |\n|:--|--:|--:|--:|--:|\n| Desktop | $8.79M | 231,979 | $37.90 | 32.0% |\n| Tablet | $1.14M | 22,828 | $50.04 | 8.0% |\n| Mobile | $10.55M | 156,133 | $67.54 | 60.0% |\n\n**In one line:** the device with the largest impression share (Mobile, 60%) has the highest CPA, while Desktop, with 32% of impressions, has the lowest, so the biggest audience is the least efficient per conversion.",
+      "seconds": 20.0,
+      "inputTokens": 7320,
+      "outputTokens": 1227,
+      "recordedAt": "2026-11-16"
+    },
+    {
+      "title": "Top Advertisers",
+      "question": "List the ten advertisers with the most spend over the last 30 days. Give me the advertiser name, the managing agency, spend, and ROAS. Show it as a Markdown table, and show the SQL you ran.",
+      "reasoning": "",
+      "answer": "The ten advertisers with the most spend over the 30 days ending 2026-07-13 are below. Cedar Path Co leads at about $450K. Two of the ten are self-managed. ROAS ranges from 2.32 (Blue Haven Co) to 11.46 (Harbor Stone Co).\n\n| Advertiser | Managing agency | Spend (30d) | ROAS |\n|:--|:--|--:|--:|\n| Cedar Path Co | Silver Point Media | $449,763.09 | 3.27 |\n| Blue Haven Co | Summit Ridge Media | $447,789.99 | 2.32 |\n| Lake Forge Co | Cedar Field Media | $426,579.64 | 6.71 |\n| Iron Peak Co | (self-managed) | $403,956.90 | 8.45 |\n| Summit Stone Co | (self-managed) | $399,314.90 | 2.75 |\n| Crescent Gate Co | North Field Media | $395,062.16 | 2.74 |\n| Iron Ridge Co | Bright Peak Media | $371,785.75 | 3.40 |\n| Crescent Point Co | Summit Field Media | $352,848.33 | 6.49 |\n| Harbor Path Co | Summit Field Media | $348,254.70 | 3.72 |\n| Harbor Stone Co | Summit Gate Media | $337,196.06 | 11.46 |\n\nROAS is conversion value divided by spend, using the engine aggregate (`daily_stats.conversion_value`). Each of the ten has at most one active agency engagement, so no spend is double-counted.\n\n```sql\nWITH adv_spend AS (\n    SELECT ea.advertiser_id,\n           SUM(ds.cost) AS spend_30d,\n           SUM(ds.conversion_value) AS conv_value_30d\n    FROM daily_stats ds\n    CROSS JOIN v_reference_date r\n    JOIN campaign c ON c.campaign_id = ds.campaign_id\n    JOIN engine_account ea ON ea.engine_account_id = c.engine_account_id\n    WHERE ds.report_date > DATEADD(day, -30, r.reference_date)\n      AND ds.report_date <= r.reference_date\n    GROUP BY ea.advertiser_id\n),\nactive_agency AS (\n    SELECT ac.advertiser_id, COUNT(*) AS n_active, MIN(ac.agency_id) AS agency_id\n    FROM agency_client ac\n    WHERE ac.is_active = 1\n    GROUP BY ac.advertiser_id\n)\nSELECT a.advertiser_name,\n       COALESCE(ag.agency_name, '(self-managed)') AS agency_name,\n       ROUND(s.spend_30d, 2) AS spend_30d,\n       ROUND(s.conv_value_30d / NULLIF(s.spend_30d, 0), 2) AS roas,\n       aa.n_active\nFROM adv_spend s\nJOIN advertiser a ON a.advertiser_id = s.advertiser_id\nLEFT JOIN active_agency aa ON aa.advertiser_id = s.advertiser_id\nLEFT JOIN agency ag ON ag.agency_id = aa.agency_id\nORDER BY s.spend_30d DESC\nLIMIT 10\n```",
+      "seconds": 27.7,
+      "inputTokens": 10218,
+      "outputTokens": 2799,
+      "recordedAt": "2026-11-16"
+    },
+    {
+      "title": "Customer Journey",
+      "question": "Trace how conversion paths move through the funnel: how many conversions start with an upper, mid and lower funnel channel, and how many end with each. Put the count on each stage. Show it as a flowchart.",
+      "reasoning": "",
+      "answer": "Most conversion paths open upstream and close downstream. Upper-funnel channels start 56% of paths but finish only 8%, while lower-funnel channels finish 73%. This covers 5,000 Floodlight conversions over the 90-day Floodlight window ending 2026-07-13.\n\n```mermaid\nflowchart LR\n    U1[Starts upper: 2,816] -->|2,041 end lower| L2[Ends lower: 3,629]\n    U1 -->|554 end mid| M2[Ends mid: 974]\n    U1 -->|221 end upper| U2[Ends upper: 397]\n    M1[Starts mid: 928] -->|663 end lower| L2\n    M1 -->|191 end mid| M2\n    M1 -->|74 end upper| U2\n    L1[Starts lower: 1,256] -->|925 end lower| L2\n    L1 -->|229 end mid| M2\n    L1 -->|102 end upper| U2\n```\n\n| Stage | Starts path (first touch) | Share | Ends path (last touch) | Share |\n|---|---|---|---|---|\n| Upper | 2,816 | 56.3% | 397 | 7.9% |\n| Mid | 928 | 18.6% | 974 | 19.5% |\n| Lower | 1,256 | 25.1% | 3,629 | 72.6% |\n\n- The largest flow is upper to lower: 2,041 conversions, about 41% of all conversions.\n- Only 221 paths both start and end upper. Upper channels mostly open paths and hand them to lower channels.\n- Under last-click, the lower funnel gets most of the credit. Attribution models that credit earlier touches would show a bigger upper-funnel contribution. For channel-level credit under all six models, see `mv_attribution_six_models`. Its data-driven column is a non-production simulation, illustrative only.",
+      "seconds": 25.2,
+      "inputTokens": 10313,
+      "outputTokens": 2682,
+      "recordedAt": "2026-11-16"
+    },
+    {
+      "title": "Path Length",
+      "question": "How many touches do conversion paths take, and what share of conversions have more than two touches? Say whether paths are long enough for the choice of attribution model to matter.",
+      "reasoning": "",
+      "answer": "**Short answer:** Most conversion paths are longer than one touch, and 60% have three or more touches. That is long enough for the attribution model to matter, and the models disagree sharply.\n\n**Path length (Floodlight events, all 5,000 conversions in `attribution_path`)**\n\n| Touches | Conversions | Share |\n|---:|---:|---:|\n| 2 | 1,997 | 39.9% |\n| 3 | 1,476 | 29.5% |\n| 4 | 739 | 14.8% |\n| 5 | 551 | 11.0% |\n| 6 | 237 | 4.7% |\n\n- The typical path has 2 or 3 touches. The mean is not computed here, but the distribution is skewed toward short paths with a long tail.\n- **Conversions with more than two touches: 3,003 of 5,000, or 60.1%.**\n- Paths start at a minimum of 2 touches, so no conversion is a single-touch path.\n\n**Does the model choice matter?**\n\nYes. The same $2.11M of conversion value is split very differently by each model. The totals match across models, so the difference is only in who gets the credit:\n\n| Model | Display | Paid Search |\n|---|---:|---:|\n| First-click | $643.7K | $450.4K |\n| Last-click | $62.2K | $1,351.8K |\n| Linear | $360.3K | $810.5K |\n| Position-based | $356.8K | $858.8K |\n| Time-decay | $310.0K | $886.0K |\n\nDisplay earns $644K under first-click but only $62K under last-click. Last-click gives Paid Search about three times the credit it gets under first-click, which is the lower-funnel bias described in the attribution notes. With 60% of paths running three or more touches, the middle models (linear, position-based, time-decay) are where the upper-funnel channels get a fair share.\n\nNotes:\n- Source: Floodlight events (`conversion` and `attribution_path`). The query covers all paths in the table, which spans the 90-day Floodlight window ending 2026-07-13. I did not filter by date.\n- The `data_driven_simulated` model is a non-production simulation, illustrative only. Its Display and Paid Search values are $384K and $795K. I did not use it for the conclusions above.",
+      "seconds": 21.7,
+      "inputTokens": 10950,
+      "outputTokens": 2289,
+      "recordedAt": "2026-11-16"
+    }
+  ]
 }

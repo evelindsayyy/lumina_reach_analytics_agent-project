@@ -176,7 +176,7 @@ action = "Over the last 30 days, compare Google Ads and Microsoft Advertising on
 render = "chart"
 title = "CPA Trend"
 label = "Is CPA getting better or worse?"
-action = "Give me the CPA for each day of the last 30 days. Show it as a line chart, then say in one line whether CPA is improving or getting worse."
+action = "Give me the CPA for each of the last 21 days. Show it as a line chart, then say in one line whether CPA is improving or getting worse."
 
 # === table 2 / 3 (audit) ===
 [[chat.suggestedActions]]

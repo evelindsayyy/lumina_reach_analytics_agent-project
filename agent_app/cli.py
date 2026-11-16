@@ -256,17 +256,20 @@ class Cli:
 
         raise SystemExit(deployed_check.run(question or deployed_check.DEFAULT_QUESTION))
 
-    def record_demos(self) -> None:
+    def record_demos(self, only: str = "") -> None:
         """
         Ask the deployed agent every example question of data/site.toml and
         write the answers to data/demo-answers.json, which the web app replays
         at no cost (spends from the deployment's budget; resets the test
         user's own allowance).
+
+        :param only: the title of one example to re-record; the others are kept.
         """
-        from agent_app.config import get_env
+        from agent_app.config import get_env, load_env_files
         from agent_app.agentcore_project import demo_recorder
 
-        raise SystemExit(demo_recorder.run(get_env("AGENTCORE_LLM_MODEL_ID") or ""))
+        load_env_files()
+        raise SystemExit(demo_recorder.run(get_env("AGENTCORE_LLM_MODEL_ID") or "", only=only))
 
     def web_env(self) -> None:
         """

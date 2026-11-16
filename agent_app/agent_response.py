@@ -23,25 +23,47 @@ RENDERABLE_BLOCKS = ("chart", "mermaid")
 _THINKING = r"<thinking>(.*?)</thinking>"
 
 
+#: Tools the agent calls after it has answered. Text on either side of one of
+#: these belongs to the same answer.
+REPORTING_TOOLS = frozenset({"write_debug_report"})
+
+
+def _add_answer_block(blocks: list[str], text: str) -> list[str]:
+    """``blocks`` plus ``text``, without repeating what one already says."""
+    if any(text in block for block in blocks):
+        return blocks
+    return [block for block in blocks if block not in text] + [text]
+
+
 def extract_text_from_messages(messages: list, start_index: int = 0) -> str:
     """
-    Collect thinking from every assistant message, plus the last real answer.
+    Collect thinking from every assistant message, plus the answer: all the
+    text written after the last data tool call.
 
-    The answer comes from the last assistant message that still has text once
-    the thinking is stripped, **which is not always the last message**. An agent
-    that answers and then calls ``write_debug_report`` often signs off with
-    nothing but ``<thinking>``; reading the final message unconditionally yields
-    an empty answer, and the UI shows a reasoning block with no reply under it,
-    which reads to the user as a hang.
+    **The answer can span several messages.** An agent often writes its
+    answer (a chart, a table), calls ``write_debug_report``, then signs off
+    with one more line or with nothing but ``<thinking>``. Reading only the
+    final text lost the chart; reading the final message unconditionally
+    yielded an empty answer, which the UI shows as a hang. Text before a data
+    tool call (``execute_sql_query`` and the like) is narration, not answer,
+    so each such call starts the answer afresh; if nothing follows the last
+    one, the last text written is the answer.
     """
     all_thinking = []
-    last_answer_text = None
+    answer_blocks: list[str] = []
+    last_text = None
 
     for msg in messages[start_index:]:
         if msg.get("role") != "assistant":
             continue
         for item in msg.get("content", []):
-            if not (isinstance(item, dict) and "text" in item):
+            if not isinstance(item, dict):
+                continue
+            tool_use = item.get("toolUse")
+            if isinstance(tool_use, dict) and tool_use.get("name") not in REPORTING_TOOLS:
+                answer_blocks = []
+                continue
+            if "text" not in item:
                 continue
             text = item["text"]
             all_thinking.extend(
@@ -49,13 +71,15 @@ def extract_text_from_messages(messages: list, start_index: int = 0) -> str:
             )
             stripped = re.sub(_THINKING, "", text, flags=re.DOTALL).strip()
             if stripped:
-                last_answer_text = stripped
+                last_text = stripped
+                answer_blocks = _add_answer_block(answer_blocks, stripped)
 
+    answer = "\n\n".join(answer_blocks) if answer_blocks else last_text
     texts = []
     if all_thinking:
         texts.append("<thinking>" + "\n\n".join(all_thinking) + "</thinking>")
-    if last_answer_text:
-        texts.append(last_answer_text)
+    if answer:
+        texts.append(answer)
     return "\n".join(texts)
 
 

@@ -80,6 +80,65 @@ class TestExtractTextFromMessages:
         assert answer == "New answer."
 
 
+def _assistant_then_tool(text: str, tool: str) -> dict:
+    return {"role": "assistant", "content": [{"text": text}, {"toolUse": {"name": tool, "input": {}}}]}
+
+
+class TestAnswerSpansTheReportCall:
+    """
+    Found in a recorded answer: the agent wrote its chart, called
+    write_debug_report, then signed off with one line. Keeping only the last
+    text lost the chart ("Line chart delivered", said the report).
+    """
+
+    CHART = "```chart\n{\"type\": \"line\"}\n```"
+
+    def test_text_before_and_after_the_report_call_is_one_answer(self):
+        messages = [
+            _user("CPA per day as a line chart?"),
+            _assistant_then_tool("Let me look at the schema.", "get_database_schema"),
+            _user("<schema>"),
+            _assistant_then_tool("Now the daily CPA.", "execute_sql_query"),
+            _user("<rows>"),
+            _assistant_then_tool(f"Daily CPA:\n\n{self.CHART}", "write_debug_report"),
+            _user("<report written>"),
+            _assistant("CPA is flat."),
+        ]
+        _, answer = parse_agent_response(messages)
+        assert answer == f"Daily CPA:\n\n{self.CHART}\n\nCPA is flat."
+
+    def test_narration_before_the_last_query_is_not_the_answer(self):
+        messages = [
+            _assistant_then_tool("I will check the schema first.", "get_database_schema"),
+            _user("<schema>"),
+            _assistant_then_tool("Querying now.", "execute_sql_query"),
+            _user("<rows>"),
+            _assistant("There are 12 rows."),
+        ]
+        assert parse_agent_response(messages)[1] == "There are 12 rows."
+
+    def test_a_restated_answer_is_not_repeated(self):
+        messages = [
+            _assistant_then_tool("There are 12 rows.", "write_debug_report"),
+            _user("<report written>"),
+            _assistant("There are 12 rows.\n\nAll of them are active."),
+        ]
+        assert parse_agent_response(messages)[1] == "There are 12 rows.\n\nAll of them are active."
+
+    def test_a_sign_off_already_in_the_answer_is_dropped(self):
+        messages = [
+            _assistant_then_tool("There are 12 rows. All of them are active.", "write_debug_report"),
+            _user("<report written>"),
+            _assistant("All of them are active."),
+        ]
+        assert parse_agent_response(messages)[1] == "There are 12 rows. All of them are active."
+
+    def test_a_final_query_with_nothing_after_it_keeps_the_last_text(self):
+        """The old fallback: better the last words than nothing."""
+        messages = [_assistant_then_tool("Here is what I found so far.", "execute_sql_query"), _user("<rows>")]
+        assert parse_agent_response(messages)[1] == "Here is what I found so far."
+
+
 class TestToolBlocksAreSkipped:
     def test_tool_use_and_result_blocks_are_ignored(self):
         """
@@ -205,8 +264,8 @@ class TestParseAgentResponse:
         ]
         thinking, answer = parse_agent_response(messages)
         assert thinking == "picking a chart"
-        assert answer.startswith("```chart")
-        assert "```" in answer
+        # the intro and the chart are one answer, the chart tag now a fence
+        assert answer == 'Here is the trend:\n\n```chart\n{"type": "bar"}\n```'
 
     def test_normalizes_what_the_two_step_path_would_miss(self):
         """This is the step the debug path used to skip."""

@@ -5,6 +5,7 @@ Recording the example questions' answers from the deployed agent: the parts
 that need no AWS.
 """
 
+import dataclasses
 import json
 
 import pytest
@@ -72,18 +73,22 @@ class TestStream:
         assert dr.is_real_answer("Widget A sold 1,024 units.")
 
 
+def entry(question="List the ten best-selling widgets.", answer="a", recorded_at="2026-11-16"):
+    return dr.RecordedAnswer(
+        title="Top Widgets",
+        question=question,
+        reasoning="r",
+        answer=answer,
+        seconds=12.34,
+        input_tokens=1500,
+        output_tokens=300,
+        recorded_at=recorded_at,
+    )
+
+
 class TestFile:
     def test_the_web_app_reads_camel_case(self):
-        entry = dr.RecordedAnswer(
-            title="Top Widgets",
-            question="List the ten best-selling widgets.",
-            reasoning="r",
-            answer="a",
-            seconds=12.34,
-            input_tokens=1500,
-            output_tokens=300,
-        )
-        data = json.loads(dr.render_demo_answers("2026-11-16", "claude-acme", [entry]))
+        data = json.loads(dr.render_demo_answers("claude-acme", [entry()]))
         assert data["recordedAt"] == "2026-11-16"
         assert data["model"] == "claude-acme"
         assert data["answers"] == [
@@ -95,8 +100,39 @@ class TestFile:
                 "seconds": 12.3,
                 "inputTokens": 1500,
                 "outputTokens": 300,
+                "recordedAt": "2026-11-16",
             }
         ]
+
+    def test_round_trip(self):
+        text = dr.render_demo_answers("claude-acme", [entry()])
+        assert dr.parse_demo_answers(text) == [dataclasses.replace(entry(), seconds=12.3)]
+        assert dr.parse_demo_answers('{"recordedAt": "", "model": "", "answers": []}') == []
+
+    def test_the_file_date_is_the_newest_recording(self):
+        older = entry(question="q1", recorded_at="2026-11-01")
+        data = json.loads(dr.render_demo_answers("m", [older, entry(question="q2")]))
+        assert data["recordedAt"] == "2026-11-16"
+        assert json.loads(dr.render_demo_answers("m", []))["recordedAt"] == ""
+
+
+class TestMerge:
+    QUESTIONS = [("A", "qa"), ("B", "qb"), ("C", "qc")]
+
+    def test_a_rerecorded_answer_replaces_its_old_one_in_site_order(self):
+        previous = [entry(question="qc", answer="old c"), entry(question="qa", answer="old a")]
+        merged = dr.merge_answers(previous, [entry(question="qc", answer="new c")], self.QUESTIONS)
+        assert [(e.question, e.answer) for e in merged] == [("qa", "old a"), ("qc", "new c")]
+
+    def test_an_answer_to_a_question_no_longer_asked_is_dropped(self):
+        merged = dr.merge_answers([entry(question="gone")], [entry(question="qb")], self.QUESTIONS)
+        assert [e.question for e in merged] == ["qb"]
+
+    def test_only_picks_questions_by_title(self):
+        assert dr.select_questions(self.QUESTIONS, "") == self.QUESTIONS
+        assert dr.select_questions(self.QUESTIONS, "b") == [("B", "qb")]
+        with pytest.raises(ValueError, match="No example question titled"):
+            dr.select_questions(self.QUESTIONS, "Z")
 
     def test_it_lives_with_the_site_copy(self):
         assert path_enum.path_demo_answers_json.parent == path_enum.dir_data

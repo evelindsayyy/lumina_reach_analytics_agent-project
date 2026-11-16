@@ -396,10 +396,14 @@ class TestRecordDemos:
     def test_records_with_the_deployed_model(self, monkeypatch):
         seen = {}
         monkeypatch.setenv("AGENTCORE_LLM_MODEL_ID", "claude-acme")
-        monkeypatch.setattr(
-            "agent_app.agentcore_project.demo_recorder.run", lambda model_id: seen.setdefault("model", model_id) and 0
-        )
+        monkeypatch.setattr("agent_app.config.load_env_files", lambda: None)
+
+        def run(model_id, only):
+            seen.update(model=model_id, only=only)
+            return 0
+
+        monkeypatch.setattr("agent_app.agentcore_project.demo_recorder.run", run)
         with pytest.raises(SystemExit) as exc:
-            cli.Cli().record_demos()
+            cli.Cli().record_demos(only="CPA Trend")
         assert exc.value.code == 0
-        assert seen["model"] == "claude-acme"
+        assert seen == {"model": "claude-acme", "only": "CPA Trend"}

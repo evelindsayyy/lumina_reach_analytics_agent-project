@@ -17,7 +17,8 @@ deployment-wide counters still count every token, so the recording is paid
 from the same budget it reports.
 
 Run it as ``mise run ac-record-demos`` (= ``agent-app record-demos``) after a
-deploy, and commit the file. A refusal or a failed turn stops the run and
+deploy, and commit the file; ``agent-app record-demos --only "<title>"``
+re-records one answer and keeps the others. A refusal or a failed turn stops the run and
 writes nothing.
 """
 
@@ -66,6 +67,8 @@ class RecordedAnswer:
     #: Input at its price (cache reads a tenth), as the quota counts it.
     input_tokens: int
     output_tokens: int
+    #: The UTC date it was recorded: answers are re-recorded one at a time.
+    recorded_at: str
 
 
 def example_questions(site_toml: str) -> list[tuple[str, str]]:
@@ -86,10 +89,10 @@ def is_real_answer(answer: str) -> bool:
     return bool(answer.strip()) and answer.strip() not in NON_ANSWERS
 
 
-def render_demo_answers(recorded_at: str, model_id: str, answers: list[RecordedAnswer]) -> str:
-    """The file the web app imports, in its camelCase."""
+def render_demo_answers(model_id: str, answers: list[RecordedAnswer]) -> str:
+    """The file the web app imports, in its camelCase; dated by its newest answer."""
     data = {
-        "recordedAt": recorded_at,
+        "recordedAt": max((a.recorded_at for a in answers), default=""),
         "model": model_id,
         "answers": [
             {
@@ -100,11 +103,53 @@ def render_demo_answers(recorded_at: str, model_id: str, answers: list[RecordedA
                 "seconds": round(a.seconds, 1),
                 "inputTokens": a.input_tokens,
                 "outputTokens": a.output_tokens,
+                "recordedAt": a.recorded_at,
             }
             for a in answers
         ],
     }
     return json.dumps(data, indent=2, ensure_ascii=False) + "\n"
+
+
+def parse_demo_answers(text: str) -> list[RecordedAnswer]:
+    """The answers of a file written by :func:`render_demo_answers`."""
+    return [
+        RecordedAnswer(
+            title=a["title"],
+            question=a["question"],
+            reasoning=a["reasoning"],
+            answer=a["answer"],
+            seconds=a["seconds"],
+            input_tokens=a["inputTokens"],
+            output_tokens=a["outputTokens"],
+            recorded_at=a["recordedAt"],
+        )
+        for a in json.loads(text)["answers"]
+    ]
+
+
+def select_questions(questions: list[tuple[str, str]], only: str) -> list[tuple[str, str]]:
+    """All the ``questions``, or the one titled ``only`` (any case)."""
+    if not only:
+        return questions
+    picked = [(title, q) for title, q in questions if title.lower() == only.lower()]
+    if not picked:
+        titles = ", ".join(title for title, _ in questions)
+        raise ValueError(f"No example question titled {only!r}; the titles are: {titles}")
+    return picked
+
+
+def merge_answers(
+    previous: list[RecordedAnswer],
+    recorded: list[RecordedAnswer],
+    questions: list[tuple[str, str]],
+) -> list[RecordedAnswer]:
+    """
+    The new recordings over the previous ones, in the order of the example
+    questions; an answer to a question no longer asked is dropped.
+    """
+    by_question = {a.question: a for a in previous} | {a.question: a for a in recorded}
+    return [by_question[q] for _, q in questions if q in by_question]
 
 
 def quota_table_name(session: boto3.Session) -> str:  # pragma: no cover - needs AWS
@@ -115,7 +160,7 @@ def quota_table_name(session: boto3.Session) -> str:  # pragma: no cover - needs
     raise RuntimeError(f"No DynamoDB table in stack {dc.STACK_NAME}")
 
 
-def run(model_id: str) -> int:  # pragma: no cover - needs AWS and the deployed agent
+def run(model_id: str, only: str = "") -> int:  # pragma: no cover - needs AWS and the deployed agent
     from ..api import one
     from ..quota import get_usage
     from ..quota import get_user_app_id
@@ -131,7 +176,9 @@ def run(model_id: str) -> int:  # pragma: no cover - needs AWS and the deployed 
     user_key = {"app_id": {"S": get_user_app_id(config, str(jwt_claims(token)["sub"]))}}
 
     recorded = []
-    questions = example_questions(path_enum.path_site_toml.read_text(encoding="utf-8"))
+    all_questions = example_questions(path_enum.path_site_toml.read_text(encoding="utf-8"))
+    questions = select_questions(all_questions, only)
+    today = datetime.datetime.now(datetime.timezone.utc).date().isoformat()
     for index, (title, question) in enumerate(questions, start=1):
         dynamodb.delete_item(TableName=config.dynamodb_table_name_quota, Key=user_key)
         started = time.monotonic()
@@ -151,6 +198,7 @@ def run(model_id: str) -> int:  # pragma: no cover - needs AWS and the deployed 
                 seconds=seconds,
                 input_tokens=usage[ATTR_INPUT_TOKEN],
                 output_tokens=usage[ATTR_OUTPUT_TOKEN],
+                recorded_at=today,
             )
         )
         print(
@@ -160,7 +208,9 @@ def run(model_id: str) -> int:  # pragma: no cover - needs AWS and the deployed 
     # leave the test user a fresh allowance for `mise run ac-test`
     dynamodb.delete_item(TableName=config.dynamodb_table_name_quota, Key=user_key)
 
-    recorded_at = datetime.datetime.now(datetime.timezone.utc).date().isoformat()
-    path_enum.path_demo_answers_json.write_text(render_demo_answers(recorded_at, model_id, recorded), encoding="utf-8")
-    print(f"Wrote {len(recorded)} answers to {path_enum.path_demo_answers_json.relative_to(path_enum.dir_project_root)}")
+    path = path_enum.path_demo_answers_json
+    previous = parse_demo_answers(path.read_text(encoding="utf-8")) if path.is_file() else []
+    merged = merge_answers(previous, recorded, all_questions)
+    path.write_text(render_demo_answers(model_id, merged), encoding="utf-8")
+    print(f"Recorded {len(recorded)}; {path.relative_to(path_enum.dir_project_root)} has {len(merged)} answers")
     return 0

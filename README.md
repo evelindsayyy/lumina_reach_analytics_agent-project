@@ -139,6 +139,21 @@ does it once at build time and ships the result in the MCP runtime's CodeZip
 cold MCP runtime then has its schema and a warehouse connection in about 2 s.
 Redeploy after `wh-snowflake-sync` so the snapshot follows the warehouse.
 
+Budget (about $5 a month in all, shared by every visitor):
+
+- **Prompt caching.** Each tool round resends the system prompt, the tools
+  and the conversation; cache breakpoints make the repeats cost a tenth
+  (`agent_app/prompt_cache.py`). One question went from about 42k to about
+  21k input tokens, counted at their price.
+- **Caps.** Each account gets 3 live questions a month; the deployment-wide
+  token caps, which count cached input at its price, hold the model at about
+  $3. The hard stop is the spend limit in the provider's console.
+- **Recorded examples.** `mise run ac-record-demos` asks the deployed agent
+  every example question and writes `data/demo-answers.json`. Deployed, a new
+  chat that picks an example replays that answer, with no sign-in and no
+  cost, so every visitor sees the agent work even after the month's budget
+  is spent. Typed questions are always live.
+
 ```bash
 mise run wh-snowflake-sync     # the warehouse
 mise run snowflake-key-deploy  # the warehouse key, to SSM (writes to AWS)
@@ -146,6 +161,7 @@ mise run anthropic-key-deploy  # the model key, to SSM (writes to AWS)
 mise run ac-check-wheels       # every dependency has a Linux aarch64 wheel
 mise run ac-build              # package + synthesize, no AWS write
 mise run ac-deploy             # writes to AWS
+mise run ac-record-demos       # record the example answers (spends ~12 questions)
 ```
 
 ## Tests

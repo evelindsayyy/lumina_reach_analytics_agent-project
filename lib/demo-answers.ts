@@ -17,10 +17,12 @@ export interface DemoAnswer {
   seconds: number;
   inputTokens: number;
   outputTokens: number;
+  /** The UTC date this answer was recorded (answers are re-recorded one at a time). */
+  recordedAt?: string;
 }
 
 export interface DemoAnswers {
-  /** The UTC date of the recording, or "" before the first one. */
+  /** The newest answer's recording date, or "" before the first one. */
   recordedAt: string;
   model: string;
   answers: DemoAnswer[];
@@ -67,7 +69,7 @@ export function findDemoAnswer(body: string, demos: DemoAnswers): DemoAnswer | n
 export function demoNote(demos: DemoAnswers, demo: DemoAnswer): string {
   return (
     `> **Recorded answer.** This replays what the live agent (Amazon Bedrock AgentCore + Snowflake) ` +
-    `answered on ${demos.recordedAt}, in ${Math.round(demo.seconds)} s. ` +
+    `answered on ${demo.recordedAt || demos.recordedAt}, in ${Math.round(demo.seconds)} s. ` +
     `Sign in and type your own question for a live answer.\n\n`
   );
 }
