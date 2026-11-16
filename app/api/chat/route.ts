@@ -24,10 +24,10 @@ import recordedDemos from "@/data/demo-answers.json";
 // user's access token: AgentCore's JWT authorizer checks it before the agent
 // sees the request, so this tier holds no AWS credential and no secret.
 //
-// Deployed, a new chat that asks one of the example questions replays the
-// answer recorded from the live agent instead (lib/demo-answers.ts): no
-// sign-in and no cost, so every visitor sees it work even after the month's
-// budget is spent. Locally every question is live.
+// Deployed, a request that asks one of the example questions, at any turn,
+// replays the answer recorded from the live agent instead
+// (lib/demo-answers.ts): no sign-in and no cost, so every visitor sees it work
+// even after the month's budget is spent. Locally every question is live.
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

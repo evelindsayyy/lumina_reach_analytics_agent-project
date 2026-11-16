@@ -9,7 +9,7 @@ import {
   demoStreamEvents,
   demoStreamResponse,
   findDemoAnswer,
-  firstQuestionOf,
+  latestQuestionOf,
 } from "../lib/demo-answers.ts";
 
 const DEMOS = {
@@ -47,18 +47,20 @@ function payloads(events) {
     .map((data) => (data === "[DONE]" ? data : JSON.parse(data)));
 }
 
-test("the question of a new chat is its one user message", () => {
-  assert.equal(firstQuestionOf(request("List the ten best-selling widgets.")), "List the ten best-selling widgets.");
-  assert.equal(firstQuestionOf(request("Hi", "Hello", "List the ten best-selling widgets.")), null);
-  assert.equal(firstQuestionOf("not json"), null);
-  assert.equal(firstQuestionOf(JSON.stringify({ messages: "x" })), null);
+test("the question is the newest message, when the user sent it", () => {
+  assert.equal(latestQuestionOf(request("List the ten best-selling widgets.")), "List the ten best-selling widgets.");
+  assert.equal(latestQuestionOf(request("Hi", "Hello", "List the ten best-selling widgets.")), "List the ten best-selling widgets.");
+  assert.equal(latestQuestionOf(request("Hi", "Hello")), null);
+  assert.equal(latestQuestionOf("not json"), null);
+  assert.equal(latestQuestionOf(JSON.stringify({ messages: "x" })), null);
+  assert.equal(latestQuestionOf(JSON.stringify({ messages: [] })), null);
 });
 
-test("only an example question, asked first, replays", () => {
+test("an example question replays, first or as a follow-up in the same chat", () => {
   assert.equal(findDemoAnswer(request("List the ten best-selling widgets."), DEMOS)?.title, "Top Widgets");
   assert.equal(findDemoAnswer(request("  List the ten best-selling widgets. "), DEMOS)?.title, "Top Widgets");
+  assert.equal(findDemoAnswer(request("Hi", "Hello", "List the ten best-selling widgets."), DEMOS)?.title, "Top Widgets");
   assert.equal(findDemoAnswer(request("List the ten worst widgets."), DEMOS), null);
-  assert.equal(findDemoAnswer(request("Hi", "Hello", "List the ten best-selling widgets."), DEMOS), null);
 });
 
 test("the replay says it is a recording, from when, and how to ask live", () => {

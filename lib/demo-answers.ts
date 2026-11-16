@@ -1,10 +1,11 @@
 // Replays of the deployed agent's recorded answers to the example questions.
 //
 // The live demo runs on a small monthly budget shared by every visitor, so
-// once it is spent a newcomer would see nothing work. The example questions on
-// the chat's start screen therefore replay answers recorded from the deployed
-// agent (`mise run ac-record-demos` writes data/demo-answers.json): no sign-in,
-// no model call, no cost, and always there. Typed questions stay live.
+// once it is spent a newcomer would see nothing work. The example questions
+// (on the chat's start screen, and offered again under each answer) therefore
+// replay answers recorded from the deployed agent (`mise run ac-record-demos`
+// writes data/demo-answers.json): no sign-in, no model call, no cost, and
+// always there. Typed questions stay live.
 //
 // No imports on purpose, so `node --test` runs it directly (tests_node/).
 
@@ -39,18 +40,18 @@ interface RequestMessage {
 }
 
 /**
- * The text of the one user message of a new chat's first request, or null
- * when the request is anything else (a follow-up, or not an AI SDK request).
+ * The text of the newest message of an AI SDK request when the user sent it
+ * (the question being asked now), else null.
  */
-export function firstQuestionOf(body: string): string | null {
+export function latestQuestionOf(body: string): string | null {
   let messages: unknown;
   try {
     messages = (JSON.parse(body) as { messages?: unknown }).messages;
   } catch {
     return null;
   }
-  if (!Array.isArray(messages) || messages.length !== 1) return null;
-  const message = messages[0] as RequestMessage;
+  if (!Array.isArray(messages) || messages.length === 0) return null;
+  const message = messages[messages.length - 1] as RequestMessage;
   if (message?.role !== "user" || !Array.isArray(message.parts)) return null;
   return message.parts
     .filter((part: { type?: unknown }) => part?.type === "text")
@@ -58,9 +59,13 @@ export function firstQuestionOf(body: string): string | null {
     .join("");
 }
 
-/** The recording for a new chat that asks an example question, else null. */
+/**
+ * The recording for a request that asks an example question, else null. Any
+ * turn of a chat: the "ask next" suggestions under each answer are example
+ * questions, and following them must not need a sign-in.
+ */
 export function findDemoAnswer(body: string, demos: DemoAnswers): DemoAnswer | null {
-  const question = firstQuestionOf(body)?.trim();
+  const question = latestQuestionOf(body)?.trim();
   if (!question) return null;
   return demos.answers.find((demo) => demo.question.trim() === question) ?? null;
 }

@@ -121,6 +121,8 @@ welcomeSubtitle = "Ask questions about the paid search portfolio in plain Englis
 tryExamples = "Try: \"Which engine has the lower CPA?\" or \"Which campaigns are limited by budget?\""
 
 suggestionsHint = "Ask me directly or click a suggestion"
+# Above the two or three example questions offered under each answer.
+nextQuestionsLabel = "Ask next"
 inputPlaceholder = "Enter your question..."
 
 [chat.messages]

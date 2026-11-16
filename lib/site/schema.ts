@@ -97,6 +97,8 @@ export interface SiteConfig {
     welcomeSubtitle: string
     tryExamples: string
     suggestionsHint: string
+    /** Above the example questions offered under each answer. */
+    nextQuestionsLabel: string
     inputPlaceholder: string
     messages: {
       /** The whole sentence in the banner above the conversation, printed as-is. */
@@ -147,6 +149,7 @@ export const REQUIRED_SITE_KEYS: readonly string[] = [
   "chat.welcomeSubtitle",
   "chat.tryExamples",
   "chat.suggestionsHint",
+  "chat.nextQuestionsLabel",
   "chat.inputPlaceholder",
   "chat.suggestedActions",
   "chat.messages.welcomeMessage",

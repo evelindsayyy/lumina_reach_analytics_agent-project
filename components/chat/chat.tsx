@@ -3,6 +3,7 @@
 import { AssistantAvatar } from "./AssistantAvatar";
 import { PreviewMessage, ThinkingMessage } from "./message";
 import { MultimodalInput } from "./multimodal-input";
+import { NextQuestions } from "./next-questions";
 import { Overview } from "./overview";
 import { useScrollToBottom } from "@/hooks/use-scroll-to-bottom";
 import { useChat } from "@ai-sdk/react";
@@ -108,6 +109,24 @@ export function Chat({ site }: { site: SiteConfig }) {
         {isLoading &&
           messages.length > 0 &&
           messages[messages.length - 1].role === "user" && <ThinkingMessage />}
+
+        {/* What to ask next, under the latest answer once it has finished. */}
+        {!isLoading &&
+          messages.length > 0 &&
+          messages[messages.length - 1].role === "assistant" && (
+            <NextQuestions
+              label={site.chat.nextQuestionsLabel}
+              examples={site.chat.suggestedActions}
+              asked={messages
+                .filter((m) => m.role === "user")
+                .map((m) =>
+                  m.parts
+                    .map((part) => (part.type === "text" ? part.text : ""))
+                    .join(""),
+                )}
+              onAsk={(question) => sendMessage({ text: question })}
+            />
+          )}
 
         {/* Auto-scroll anchor */}
         <div
