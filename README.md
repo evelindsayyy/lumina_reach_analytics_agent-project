@@ -147,7 +147,8 @@ Budget (about $5 a month in all, shared by every visitor):
   21k input tokens, counted at their price.
 - **Caps.** Each account gets 3 live questions a month; the deployment-wide
   token caps, which count cached input at its price, hold the model at about
-  $3. The hard stop is the spend limit in the provider's console.
+  $3 (about 115 questions, split so input and output run out together). The
+  hard stop is the spend limit in the provider's console.
 - **Recorded examples.** `mise run ac-record-demos` asks the deployed agent
   every example question and writes `data/demo-answers.json`. Deployed, a new
   chat that picks an example replays that answer, with no sign-in and no
