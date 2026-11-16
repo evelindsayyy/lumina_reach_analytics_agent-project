@@ -116,6 +116,28 @@ LLM_PROVIDER="anthropic"
 ANTHROPIC_API_KEY="..."
 ```
 
+## Deploy (Amazon Bedrock AgentCore)
+
+One CDK stack (`agentcore/cdk/lib/cdk-stack.ts`), deployed by the AgentCore CLI:
+
+| Resource | Inbound | Its IAM role may | Its IAM role may not |
+| :--- | :--- | :--- | :--- |
+| `AnalyticsMcp` runtime (the data tools) | SigV4 only | read the Snowflake key's SSM parameter | call any Bedrock model (explicit Deny) |
+| `AnalyticsAgent` runtime (the agent) | a Cognito access token from the web client (JWT authorizer) | invoke `AnalyticsMcp` (`bind()`), call Bedrock, read/write the quota table | read the Snowflake key (explicit Deny) |
+| Cognito user pool | managed login, code + PKCE | | |
+| DynamoDB quota table | | | |
+
+Each runtime gets only its own environment: the agent has no `SNOWFLAKE_*`
+setting at all, and the MCP server gets the parameter's name, never the key.
+
+```bash
+mise run wh-snowflake-sync     # the warehouse
+mise run snowflake-key-deploy  # the key, to SSM (writes to AWS)
+mise run ac-check-wheels       # every dependency has a Linux aarch64 wheel
+mise run ac-build              # package + synthesize, no AWS write
+mise run ac-deploy             # writes to AWS
+```
+
 ## Tests
 
 ```bash
@@ -134,7 +156,7 @@ guardrails rather than any one domain.
 | :--- | :--- | :--- |
 | M2a | the app on Lumina Reach data: DuckDB/Snowflake engines, guardrails, prompt, UI | done |
 | M2b | split the agent and its tools: the agent as an AgentCore HTTP runtime, `get_database_schema` / `execute_sql_query` as an MCP server runtime, `/api/chat` as a thin proxy | done |
-| M2c | deploy on Amazon Bedrock AgentCore: per-runtime IAM roles, Cognito JWT login forwarded from the UI, Snowflake key in SSM readable only by the MCP role, per-user quota | next |
+| M2c | deploy on Amazon Bedrock AgentCore: per-runtime IAM roles, Cognito JWT login forwarded from the UI, Snowflake key in SSM readable only by the MCP role, per-user quota | in progress: stack synthesizes; deploy next |
 | M2d | evaluation: golden set from Q1–Q20 plus held-out paraphrases, result-level comparison on several seeds | planned |
 
 ## Credits

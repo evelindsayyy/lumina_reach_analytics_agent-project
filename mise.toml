@@ -8,6 +8,7 @@ ruff = "latest"
 uv = "latest"
 node = "24"
 pnpm = "latest"
+"npm:@aws/agentcore" = "1.0.1" # the AgentCore CLI: builds and deploys agentcore/
 
 # === Tasks
 [tasks.venv-create]
@@ -181,3 +182,38 @@ run = "pnpm exec concurrently --names web,agent,mcp 'mise run next-dev' 'mise ru
 [tasks.kill]
 description = "🛑 Kill this project's development servers (Next.js + both runtimes)"
 run = "uv run -- python kill-dev-servers.py"
+
+
+# === AgentCore deployment (agentcore/)
+# Generated files are git-ignored: they carry the account ID. Every task that
+# writes to AWS says so, and runs only on the owner's go-ahead.
+[tasks.ac-gen]
+description = "🏗️ Generate agentcore/ (agentcore.json, aws-targets.json, app-config.json) and build/agentcore/<Runtime>/ (one STS read, no AWS write)"
+run = ".venv/bin/agent-app ac-gen"
+
+[tasks.ac-check-wheels]
+description = "🏗️ Check every runtime's dependencies install as agentcore deploy installs them: wheels only, Linux aarch64 (dry run)"
+run = ".venv/bin/agent-app ac-check-wheels"
+depends = ["ac-gen"]
+
+[tasks.ac-cdk-install]
+description = "📦 Install the CDK app's Node.js dependencies (agentcore/cdk/)"
+run = "npm ci --prefix agentcore/cdk"
+
+[tasks.ac-build]
+description = "🏗️ Package every runtime and synthesize the stack (no AWS write)"
+run = "agentcore build"
+depends = ["ac-gen"]
+
+[tasks.snowflake-key-deploy]
+description = "🔑 Write the Snowflake service user's private key to its SSM SecureString, read only by the MCP runtime (writes to AWS)"
+run = ".venv/bin/agent-app snowflake-key-deploy"
+
+[tasks.ac-deploy]
+description = "🚀 Deploy both runtimes, their IAM roles, Cognito and the quota table (writes to AWS)"
+run = "agentcore deploy --target dev --yes"
+depends = ["ac-gen"]
+
+[tasks.ac-down]
+description = "💥 Destroy the AgentCore stack: runtimes, roles, Cognito users, quota table (writes to AWS)"
+run = [".venv/bin/agent-app ac-gen --teardown", "agentcore deploy --target dev --yes"]

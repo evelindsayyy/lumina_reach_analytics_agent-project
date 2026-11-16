@@ -206,3 +206,14 @@ $RECYCLE.BIN/
 *.msm
 *.msp
 *.lnk
+# AgentCore CLI project (agentcore/). Generated per deployment by `agent-app
+# ac-gen` and never committed: they carry the AWS account ID and the Snowflake
+# account. Only the CDK app (agentcore/cdk/) is source.
+agentcore/agentcore.json
+agentcore/aws-targets.json
+agentcore/app-config.json
+agentcore/.cli/
+agentcore/.cache/
+agentcore/.env*.local
+# The runtimes' CodeZip directories, assembled by `agent-app ac-gen`.
+build/agentcore/

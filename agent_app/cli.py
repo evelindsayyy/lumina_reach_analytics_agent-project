@@ -22,6 +22,7 @@ step with it.
     agent-app check-content
     agent-app check-content --retired "patient,bed,ward"
     agent-app test-db-conn
+    agent-app ac-gen
     agent-app snowflake-admin-key
     agent-app snowflake-sync
     agent-app print-db-schema
@@ -175,6 +176,80 @@ class Cli:
                 credit_quota=settings.credit_quota,
             )
         )
+
+    def ac_gen(self, teardown: bool = False) -> None:
+        """
+        Write the AgentCore project (``agentcore/agentcore.json``,
+        ``aws-targets.json``, ``app-config.json``) and each runtime's CodeZip
+        directory (``build/agentcore/``). Reads the AWS account of your
+        credentials (one read-only STS call); writes nothing to AWS.
+
+        :param teardown: write an empty project instead, whose deploy destroys
+            the stack.
+        """
+        import boto3
+
+        from agent_app.api import one
+        from agent_app.config import get_env
+        from agent_app.agentcore_project import codezip, gen
+        from agent_app.agentcore_project.settings import deploy_settings_from_env
+
+        try:
+            account_id = boto3.Session(region_name=one.config.aws_region).client("sts").get_caller_identity()["Account"]
+            settings = deploy_settings_from_env(one.config, get_env, account_id)
+        except Exception as e:
+            print(f"FAILED: {type(e).__name__}: {e}")
+            raise SystemExit(1)
+        if teardown:
+            gen.generate_teardown(settings)
+        else:
+            gen.generate_all(settings, codezip.export_requirements())
+        raise SystemExit(0)
+
+    def ac_check_wheels(self) -> None:
+        """
+        Check each runtime's dependencies install the way ``agentcore deploy``
+        installs them: wheels only, Linux aarch64 (a dry run, no AWS call).
+        Run ``ac-gen`` first.
+        """
+        from agent_app.agentcore_project import codezip
+        from agent_app.agentcore_project.settings import DIR_CODEZIP
+
+        paths = sorted(DIR_CODEZIP.glob("*/pyproject.toml"))
+        if not paths:
+            print("FAILED: no runtime in build/agentcore/; run `mise run ac-gen` first")
+            raise SystemExit(1)
+        failed = False
+        for path in paths:
+            error = codezip.check_codezip_install(path)
+            print(f"OK: {path.parent.name}" if error is None else f"FAILED: {path.parent.name}\n{error}")
+            failed = failed or error is not None
+        raise SystemExit(1 if failed else 0)
+
+    def snowflake_key_deploy(self) -> None:
+        """
+        Write the Snowflake service user's private key to its SSM SecureString,
+        which only the MCP runtime's role may read (writes to AWS). Only when
+        it changed; the value is never printed.
+        """
+        from agent_app.api import one
+        from agent_app.agentcore_project.settings import SNOWFLAKE_KEY_PARAM_NAME
+
+        pem = one.config.snowflake_private_key_pem
+        if not pem:
+            print("FAILED: no Snowflake private key; set SNOWFLAKE_PRIVATE_KEY_PATH in .env")
+            raise SystemExit(1)
+        ssm = one.boto_ses.client("ssm")
+        try:
+            current = ssm.get_parameter(Name=SNOWFLAKE_KEY_PARAM_NAME, WithDecryption=True)["Parameter"]["Value"]
+        except ssm.exceptions.ParameterNotFound:
+            current = None
+        if current == pem:
+            print(f"Unchanged: SSM parameter {SNOWFLAKE_KEY_PARAM_NAME}")
+            raise SystemExit(0)
+        ssm.put_parameter(Name=SNOWFLAKE_KEY_PARAM_NAME, Value=pem, Type="SecureString", Overwrite=True)
+        print(f"{'Updated' if current else 'Created'}: SSM SecureString {SNOWFLAKE_KEY_PARAM_NAME}")
+        raise SystemExit(0)
 
     def print_db_schema(self) -> None:
         """

@@ -231,3 +231,103 @@ class TestSnowflakeAdminKey:
         assert "ALTER USER ME SET RSA_PUBLIC_KEY = 'MII" in out
         assert "PRIVATE KEY" not in out
         assert (tmp_path / "admin.pem").is_file()
+
+
+@pytest.fixture
+def fake_aws(monkeypatch):
+    """moto, with dummy credentials so nothing can reach a real account."""
+    from moto import mock_aws
+
+    for name in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN"):
+        monkeypatch.setenv(name, "testing")
+    with mock_aws():
+        yield
+
+
+class TestAcGen:
+    def test_missing_settings_fail_cleanly(self, monkeypatch, fake_aws, capsys):
+        def refuse(*args):
+            raise ValueError("Set these before generating the AgentCore project: WEB_ORIGINS")
+
+        monkeypatch.setattr("agent_app.agentcore_project.settings.deploy_settings_from_env", refuse)
+        with pytest.raises(SystemExit) as exc:
+            cli.Cli().ac_gen()
+        assert exc.value.code == 1
+        assert "WEB_ORIGINS" in capsys.readouterr().out
+
+    @pytest.mark.parametrize("teardown", [False, True])
+    def test_generates_for_the_callers_account(self, monkeypatch, fake_aws, teardown):
+        seen = {}
+        monkeypatch.setattr(
+            "agent_app.agentcore_project.settings.deploy_settings_from_env",
+            lambda config, get_env, account_id: seen.setdefault("account", account_id),
+        )
+        monkeypatch.setattr("agent_app.agentcore_project.codezip.export_requirements", lambda: ["mcp==1"])
+        monkeypatch.setattr("agent_app.agentcore_project.gen.generate_all", lambda st, req: seen.setdefault("all", req))
+        monkeypatch.setattr("agent_app.agentcore_project.gen.generate_teardown", lambda st: seen.setdefault("down", True))
+        with pytest.raises(SystemExit) as exc:
+            cli.Cli().ac_gen(teardown=teardown)
+        assert exc.value.code == 0
+        assert seen["account"] == "123456789012"  # moto's account
+        assert ("down" in seen) is teardown and ("all" in seen) is not teardown
+
+
+class TestAcCheckWheels:
+    def test_needs_ac_gen_first(self, monkeypatch, tmp_path, capsys):
+        monkeypatch.setattr("agent_app.agentcore_project.settings.DIR_CODEZIP", tmp_path)
+        with pytest.raises(SystemExit) as exc:
+            cli.Cli().ac_check_wheels()
+        assert exc.value.code == 1
+
+    @pytest.mark.parametrize("error, code", [(None, 0), ("no wheel for x", 1)])
+    def test_reports_each_runtime(self, monkeypatch, tmp_path, capsys, error, code):
+        (tmp_path / "AcmeMcp").mkdir()
+        (tmp_path / "AcmeMcp" / "pyproject.toml").write_text("")
+        monkeypatch.setattr("agent_app.agentcore_project.settings.DIR_CODEZIP", tmp_path)
+        monkeypatch.setattr("agent_app.agentcore_project.codezip.check_codezip_install", lambda path: error)
+        with pytest.raises(SystemExit) as exc:
+            cli.Cli().ac_check_wheels()
+        assert exc.value.code == code
+        assert "AcmeMcp" in capsys.readouterr().out
+
+
+class TestSnowflakeKeyDeploy:
+    @pytest.fixture
+    def key(self, monkeypatch):
+        from agent_app.api import one
+
+        monkeypatch.setattr(one.config, "snowflake_private_key_pem", "-----BEGIN PRIVATE KEY-----acme")
+        monkeypatch.setattr(one.config, "aws_region", "us-east-2")
+        one.__dict__.pop("boto_ses", None)
+        yield one
+        one.__dict__.pop("boto_ses", None)
+
+    def run(self):
+        with pytest.raises(SystemExit) as exc:
+            cli.Cli().snowflake_key_deploy()
+        return exc.value.code
+
+    def test_creates_then_leaves_alone(self, fake_aws, key, capsys):
+        import boto3
+
+        from agent_app.agentcore_project.settings import SNOWFLAKE_KEY_PARAM_NAME
+
+        assert self.run() == 0
+        assert "Created" in capsys.readouterr().out
+        assert self.run() == 0
+        out = capsys.readouterr().out
+        assert "Unchanged" in out and "acme" not in out  # the value is never printed
+        param = boto3.client("ssm", region_name="us-east-2").get_parameter(Name=SNOWFLAKE_KEY_PARAM_NAME)["Parameter"]
+        assert param["Type"] == "SecureString"
+
+    def test_a_new_key_is_an_update(self, fake_aws, key, capsys):
+        self.run()
+        key.config.snowflake_private_key_pem = "-----BEGIN PRIVATE KEY-----other"
+        assert self.run() == 0
+        assert "Updated" in capsys.readouterr().out
+
+    def test_needs_a_key(self, monkeypatch, capsys):
+        from agent_app.api import one
+
+        monkeypatch.setattr(one.config, "snowflake_private_key_pem", None)
+        assert self.run() == 1
