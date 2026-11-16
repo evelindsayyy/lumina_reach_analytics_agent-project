@@ -11,36 +11,34 @@ Check the deployed agent end to end, the way the web app will call it.
 3. Checks the agent refuses a call with no token, and one signed with your
    own AWS credentials (SigV4): the JWT authorizer accepts nothing else.
 
-Usage, after `mise run ac-deploy`:
-    .venv/bin/python scripts/test_deployed_agent.py ["question"]
-
-It writes to AWS only to create the test user, once.
+Run it as ``mise run ac-test`` (= ``agent-app test-deployed [--question ...]``)
+after ``mise run ac-deploy``. It writes to AWS only to create the test user,
+once.
 """
 
 import json
 import secrets
-import sys
 import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
-from pathlib import Path
-
 import boto3
+
+from ..paths import path_enum
 
 REGION = "us-east-2"
 STACK_NAME = "AgentCore-LuminaReachAnalytics-dev"
 TEST_USER_EMAIL = "deploy-test@example.com"
-PATH_TEST_USER = Path(__file__).resolve().parent.parent / "tmp" / "deployed-test-user.json"
+PATH_TEST_USER = path_enum.dir_tmp / "deployed-test-user.json"
 DEFAULT_QUESTION = "Which three campaigns spent the most, and what was each one's CPA?"
 
 
-def stack_outputs(session: boto3.Session) -> dict[str, str]:
+def stack_outputs(session: boto3.Session) -> dict[str, str]:  # pragma: no cover - needs AWS
     stack = session.client("cloudformation").describe_stacks(StackName=STACK_NAME)["Stacks"][0]
     return {o["OutputKey"]: o["OutputValue"] for o in stack.get("Outputs", [])}
 
 
-def test_user_password(cognito, user_pool_id: str) -> str:
+def test_user_password(cognito, user_pool_id: str) -> str:  # pragma: no cover - needs AWS
     """The test user's password, creating the user on the first run."""
     if PATH_TEST_USER.is_file():
         saved = json.loads(PATH_TEST_USER.read_text())
@@ -67,7 +65,7 @@ def test_user_password(cognito, user_pool_id: str) -> str:
     return password
 
 
-def access_token(session: boto3.Session, outputs: dict[str, str]) -> str:
+def access_token(session: boto3.Session, outputs: dict[str, str]) -> str:  # pragma: no cover - needs AWS
     cognito = session.client("cognito-idp")
     password = test_user_password(cognito, outputs["UserPoolId"])
     result = cognito.admin_initiate_auth(
@@ -102,7 +100,7 @@ def session_headers() -> dict[str, str]:
     }
 
 
-def post(url: str, body: bytes, headers: dict[str, str]) -> tuple[int, str]:
+def post(url: str, body: bytes, headers: dict[str, str]) -> tuple[int, str]:  # pragma: no cover - network
     request = urllib.request.Request(url, data=body, headers=headers, method="POST")
     try:
         with urllib.request.urlopen(request, timeout=300) as response:
@@ -111,15 +109,20 @@ def post(url: str, body: bytes, headers: dict[str, str]) -> tuple[int, str]:
         return e.code, e.read().decode()
 
 
-def print_stream(text: str) -> None:
+def stream_text(text: str) -> list[tuple[str, str]]:
+    """
+    The (type, text) of every reasoning and text delta in an AI SDK v5 stream.
+    """
+    out = []
     for line in text.splitlines():
         if line.startswith("data: ") and line != "data: [DONE]":
             event = json.loads(line[len("data: "):])
             if event.get("type") in ("reasoning-delta", "text-delta"):
-                print(f"--- {event['type']}\n{event['delta']}\n")
+                out.append((event["type"], event["delta"]))
+    return out
 
 
-def sigv4_post(session: boto3.Session, url: str, body: bytes) -> int:
+def sigv4_post(session: boto3.Session, url: str, body: bytes) -> int:  # pragma: no cover - network
     from botocore.auth import SigV4Auth
     from botocore.awsrequest import AWSRequest
 
@@ -128,8 +131,7 @@ def sigv4_post(session: boto3.Session, url: str, body: bytes) -> int:
     return post(url, body, dict(request.headers))[0]
 
 
-def main() -> int:
-    question = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_QUESTION
+def run(question: str = DEFAULT_QUESTION) -> int:  # pragma: no cover - needs AWS
     session = boto3.Session(region_name=REGION)
     outputs = stack_outputs(session)
     url = invocation_url(outputs["AgentRuntimeArn"])
@@ -138,7 +140,11 @@ def main() -> int:
     token = access_token(session, outputs)
     status, text = post(url, body, {**session_headers(), "Authorization": f"Bearer {token}"})
     print(f"With a Cognito access token: HTTP {status}")
-    print_stream(text) if status == 200 else print(text[:500])
+    if status == 200:
+        for kind, delta in stream_text(text):
+            print(f"--- {kind}\n{delta}\n")
+    else:
+        print(text[:500])
 
     no_token = post(url, body, session_headers())[0]
     signed = sigv4_post(session, url, body)
@@ -147,6 +153,3 @@ def main() -> int:
     print("OK: only a Cognito token gets in" if refused else "UNEXPECTED: a call without a token was not refused")
     return 0 if status == 200 and refused else 1
 
-
-if __name__ == "__main__":
-    raise SystemExit(main())

@@ -218,6 +218,10 @@ description = "🚀 Deploy both runtimes, their IAM roles, Cognito and the quota
 run = "agentcore deploy --target dev --yes"
 depends = ["ac-gen"]
 
+[tasks.ac-test]
+description = "🧪 Ask the deployed agent a question with a Cognito token; check calls without one are refused (creates a test user once)"
+run = ".venv/bin/agent-app test-deployed"
+
 [tasks.ac-down]
 description = "💥 Destroy the AgentCore stack: runtimes, roles, Cognito users, quota table (writes to AWS)"
 run = [".venv/bin/agent-app ac-gen --teardown", "agentcore deploy --target dev --yes"]

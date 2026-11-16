@@ -230,6 +230,15 @@ class Cli:
             gen.generate_all(settings, codezip.export_requirements())
         raise SystemExit(0)
 
+    def test_deployed(self, question: str = "") -> None:
+        """
+        Ask the deployed agent one question with a Cognito token, and check a
+        call without one is refused (creates a test user on the first run).
+        """
+        from agent_app.agentcore_project import deployed_check
+
+        raise SystemExit(deployed_check.run(question or deployed_check.DEFAULT_QUESTION))
+
     def ac_check_wheels(self) -> None:
         """
         Check each runtime's dependencies install the way ``agentcore deploy``

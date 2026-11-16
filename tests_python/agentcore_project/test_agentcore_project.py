@@ -183,3 +183,33 @@ class TestGenerate:
     def test_generate_teardown(self, into_tmp):
         gen.generate_teardown(settings())
         assert "runtimes" not in json.loads((into_tmp / "agentcore" / "agentcore.json").read_text())
+
+
+class TestDeployedCheck:
+    def test_invocation_url_escapes_the_arn(self):
+        from agent_app.agentcore_project import deployed_check as dc
+
+        url = dc.invocation_url("arn:aws:bedrock-agentcore:us-east-2:111122223333:runtime/acme-x1")
+        assert url.endswith("/runtimes/arn%3Aaws%3Abedrock-agentcore%3Aus-east-2%3A111122223333%3Aruntime%2Facme-x1/invocations?qualifier=DEFAULT")
+
+    def test_session_id_is_long_enough(self):
+        from agent_app.agentcore_project import deployed_check as dc
+
+        assert len(dc.session_headers()["X-Amzn-Bedrock-AgentCore-Runtime-Session-Id"]) >= 33
+
+    def test_chat_body_is_an_ai_sdk_request(self):
+        from agent_app.agentcore_project import deployed_check as dc
+        from agent_app.vendor.vercel_ai_sdk import RequestBody
+
+        RequestBody.model_validate(json.loads(dc.chat_body("How many widgets?")))
+
+    def test_stream_text_keeps_reasoning_and_text(self):
+        from agent_app.agentcore_project import deployed_check as dc
+
+        text = (
+            'data: {"type":"reasoning-delta","id":"r","delta":"think"}\n\n'
+            'data: {"type":"text-start","id":"t"}\n\n'
+            'data: {"type":"text-delta","id":"t","delta":"42"}\n\n'
+            "data: [DONE]\n\n"
+        )
+        assert dc.stream_text(text) == [("reasoning-delta", "think"), ("text-delta", "42")]
