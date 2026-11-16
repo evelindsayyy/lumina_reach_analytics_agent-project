@@ -1,5 +1,40 @@
 # Lumina Reach Analytics Agent
 
+**An AI analytics agent for paid search data, deployed the way enterprises run
+agents: the agent and its tools are two Amazon Bedrock AgentCore runtimes, AWS
+IAM decides who may call the tools, and the web app is only the skin.**
+
+**[Live demo](https://luminareachanalyticsagent-project-2.vercel.app)** (the
+example questions need no sign-in) · [Architecture](#architecture) ·
+[Deploy](#deploy-amazon-bedrock-agentcore) · [Tests](#tests)
+
+![The home page: a search box over the agent's example questions, the four business threads as results](docs/images/home.png)
+
+## Highlights
+
+- **Agent and MCP tool server as two AgentCore runtimes.** A Strands agent on
+  Claude calls its data tools over MCP; only the agent runtime's IAM role may
+  invoke the MCP runtime (SigV4), and each runtime can read only its own secret
+  in SSM, with explicit Denies on the other's.
+- **Every call is a signed-in user.** Cognito managed login (authorization code
+  + PKCE, httpOnly cookies) on the Next.js tier, and AgentCore's JWT authorizer
+  on the agent: the web tier holds no AWS credential and no API key.
+- **Text-to-SQL that cannot hurt the warehouse.** The agent's Snowflake SQL is
+  parsed into an AST and checked (unknown tables or columns, writes, sensitive
+  columns, mixed conversion sources, averaged ratios) before it runs in an
+  always rolled-back transaction under a `SELECT`-only role.
+- **Measured performance and cost work.** The MCP runtime's cold start went
+  from 27 s to 2 s by shipping a build-time schema snapshot; prompt caching cut
+  a question from about 42k to about 12k input tokens (counted at their
+  price); the public demo is capped near $5 a month with per-user quotas, and
+  answers recorded from the live agent keep every example question working at
+  no cost.
+- **Tested.** 513 Python tests at 99% coverage and 49 Node tests, plus a
+  deployed end-to-end check (`mise run ac-test`) that only a Cognito token gets
+  in.
+
+## What it does
+
 An AI analytics agent for a paid search agency network. Business users ask
 questions in plain English: which channels really drive conversions, which
 campaigns overspend their budget, whether Google or Microsoft is cheaper per
@@ -168,9 +203,9 @@ mise run ac-record-demos       # record the example answers (spends ~12 question
 ## Tests
 
 ```bash
-mise run test-python     # 335 tests
+mise run test-python     # 513 tests
 mise run cov-python      # 99% line coverage of agent_app
-mise run test-node       # the web tier's proxy
+mise run test-node       # 49 tests: proxy, sign-in, replays, chart maths
 mise run build-web       # also validates data/site.toml against the UI
 ```
 
@@ -183,11 +218,12 @@ guardrails rather than any one domain.
 | :--- | :--- | :--- |
 | M2a | the app on Lumina Reach data: DuckDB/Snowflake engines, guardrails, prompt, UI | done |
 | M2b | split the agent and its tools: the agent as an AgentCore HTTP runtime, `get_database_schema` / `execute_sql_query` as an MCP server runtime, `/api/chat` as a thin proxy | done |
-| M2c | deploy on Amazon Bedrock AgentCore: per-runtime IAM roles, Cognito JWT login forwarded from the UI, Snowflake key in SSM readable only by the MCP role, per-user quota | in progress: stack synthesizes; deploy next |
+| M2c | deploy on Amazon Bedrock AgentCore: per-runtime IAM roles, Cognito JWT login forwarded from the UI, Snowflake key in SSM readable only by the MCP role, per-user quota | done, live |
+| M2c+ | production polish: build-time schema snapshot (cold start 27 s to 2 s), prompt caching, a $5/month budget with recorded example answers, a search-results UI, responsive charts | done |
 | M2d | evaluation: golden set from Q1–Q20 plus held-out paraphrases, result-level comparison on several seeds | planned |
 
 ## Credits
 
 The app skeleton (Next.js chat UI, Strands agent wiring,
-render blocks, content checks) started from
-[learn_ba_agent_app_scaffold-project](https://github.com/evelindsayyy/learn_ba_agent_app_scaffold-project).
+render blocks, content checks) started from a course scaffold,
+`learn_ba_agent_app_scaffold`.
