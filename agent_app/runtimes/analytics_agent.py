@@ -33,6 +33,7 @@ from ..ai_sdk_adapter import ai_sdk_streaming_response
 from ..vendor.vercel_ai_sdk import RequestBody
 from .common import AGENT_PORT
 from .common import AGENT_RUNTIME_NAME
+from .common import MCP_CLIENT_TIMEOUT_SECONDS
 from .common import MCP_RUNTIME_NAME
 from .chat_turn import run_chat_turn
 from .mcp_connection import get_mcp_connection
@@ -52,7 +53,7 @@ def new_mcp_client(url: str, auth: httpx.Auth | None = None) -> MCPClient:
     An MCP client of the server at ``url``. The agent opens it when it is built
     and ``agent.cleanup()`` closes it.
     """
-    return MCPClient(lambda: streamablehttp_client(url, auth=auth))
+    return MCPClient(lambda: streamablehttp_client(url, auth=auth, timeout=MCP_CLIENT_TIMEOUT_SECONDS))
 
 
 def make_agent(model, history: list[dict], tools: list) -> Agent:

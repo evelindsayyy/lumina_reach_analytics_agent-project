@@ -90,3 +90,10 @@ def new_mcp_server(name: str) -> FastMCP:
         streamable_http_path=MCP_PATH,
         stateless_http=True,
     )
+
+
+#: How long the agent's MCP client waits for one HTTP exchange, in seconds.
+#: The default (30 s) is shorter than a cold Snowflake schema reflection
+#: (about 35 s when the warehouse resumes), which the first tool call of a
+#: fresh MCP runtime may have to wait for.
+MCP_CLIENT_TIMEOUT_SECONDS = 120

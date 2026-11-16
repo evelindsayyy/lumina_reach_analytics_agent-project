@@ -18,10 +18,16 @@ agent used, so the guardrails and their tests did not move.
 Run it with ``python -m agent_app.runtimes.analytics_mcp``.
 """
 
+import logging
+import threading
+import time
+
 from ..one.api import one
 from .common import MCP_RUNTIME_NAME
 from .common import MCP_TRANSPORT
 from .common import new_mcp_server
+
+logger = logging.getLogger(__name__)
 
 #: The MCP server, named after the runtime.
 mcp = new_mcp_server(MCP_RUNTIME_NAME)
@@ -70,19 +76,40 @@ def execute_sql_query(sql: str) -> str:
     return one.execute_sql_query(sql=sql)
 
 
-def main():  # pragma: no cover - blocks until stopped
+def warm_schema() -> bool:
     """
-    Reflect and encode the schema, then serve, blocking until stopped.
-
-    Encoding the schema at startup does two things: the first question does not
-    pay for reflection, and a runtime that cannot reach its warehouse fails
-    here, with the reason in its log, instead of on a user's first question.
+    Reflect and encode the schema now, so the first question does not pay for
+    it, and log the outcome. A warehouse that cannot be reached is logged with
+    the reason and returns False: the tool call will try again, and fail with
+    the same reason in front of the agent.
     """
-    schema = one.database_schema_str
+    started = time.monotonic()
+    try:
+        schema = one.database_schema_str
+    except Exception:
+        logger.exception(f"{MCP_RUNTIME_NAME}: schema warm-up failed")
+        return False
     print(
         f"{MCP_RUNTIME_NAME}: {len(one.reflected_metadata.tables)} tables and views "
         f"of {one.config.schema_name!r} on {one.config.warehouse_engine} "
-        f"({len(schema):,} schema characters), serving on "
+        f"({len(schema):,} schema characters) in {time.monotonic() - started:.1f} s",
+        flush=True,
+    )
+    return True
+
+
+def main():  # pragma: no cover - blocks until stopped
+    """
+    Serve, blocking until stopped, with the schema warming on a side thread.
+
+    Not warmed before serving: on Snowflake, reflection takes about half a
+    minute when the warehouse has to resume, and a runtime that does not answer
+    while it starts looks dead to its host. A call that arrives first waits for
+    the same reflection, which the agent's MCP client timeout allows for.
+    """
+    threading.Thread(target=warm_schema, name="warm-schema", daemon=True).start()
+    print(
+        f"{MCP_RUNTIME_NAME}: serving on "
         f"{mcp.settings.host}:{mcp.settings.port}{mcp.settings.streamable_http_path}",
         flush=True,
     )

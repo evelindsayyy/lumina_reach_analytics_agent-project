@@ -112,3 +112,19 @@ if __name__ == "__main__":
         "agent_app.runtimes.analytics_mcp",
         preview=False,
     )
+
+
+class TestWarmSchema:
+    def test_warms_the_cached_schema(self, capsys):
+        assert analytics_mcp.warm_schema() is True
+        assert "schema characters" in capsys.readouterr().out
+
+    def test_a_warehouse_failure_is_logged_not_raised(self, monkeypatch, caplog):
+        class Broken:
+            @property
+            def database_schema_str(self):
+                raise RuntimeError("warehouse unreachable")
+
+        monkeypatch.setattr(analytics_mcp, "one", Broken())
+        assert analytics_mcp.warm_schema() is False
+        assert "schema warm-up failed" in caplog.text
