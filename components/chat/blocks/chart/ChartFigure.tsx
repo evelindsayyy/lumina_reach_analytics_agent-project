@@ -13,6 +13,8 @@ import {
   plotRight,
   plotTop,
   plotWidth,
+  CATEGORY_LABEL_SIZE,
+  categoryLabelStep,
 } from "./scale"
 
 /** Radius of the rounded data-end on a bar. */
@@ -69,6 +71,7 @@ export function ChartFigure({ spec }: { spec: ChartSpec }) {
   const { type, title, yLabel, categories, series } = spec
   const axis = buildYAxis(series.flatMap((s) => s.values))
   const slot = plotWidth / categories.length
+  const labelStep = categoryLabelStep(categories)
 
   return (
     <figure className="viz-root my-3 rounded-lg border border-slate-200 bg-[var(--viz-surface)] p-4">
@@ -168,18 +171,22 @@ export function ChartFigure({ spec }: { spec: ChartSpec }) {
               </text>
             ))}
 
-            {categories.map((c, ci) => (
-              <text
-                key={c}
-                x={categoryCenter(ci, categories.length)}
-                y={plotBottom + 16}
-                textAnchor="middle"
-                fontSize={11}
-                fill="var(--viz-ink-muted)"
-              >
-                {c}
-              </text>
-            ))}
+            {/* Every `labelStep`-th label, so none overlap; the others are in
+                the hover tooltip and the table view. */}
+            {categories.map((c, ci) =>
+              ci % labelStep === 0 ? (
+                <text
+                  key={c}
+                  x={categoryCenter(ci, categories.length)}
+                  y={plotBottom + 16}
+                  textAnchor="middle"
+                  fontSize={CATEGORY_LABEL_SIZE}
+                  fill="var(--viz-ink-muted)"
+                >
+                  {c}
+                </text>
+              ) : null,
+            )}
 
             {type === "bar" &&
               series.map((s, si) => {

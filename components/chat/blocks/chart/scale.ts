@@ -81,3 +81,39 @@ export function categoryCenter(index: number, count: number): number {
   const slot = plotWidth / count
   return plotLeft + slot * index + slot / 2
 }
+
+/** Font size of the category labels, in SVG user units. */
+export const CATEGORY_LABEL_SIZE = 11
+
+/** Average glyph width as a share of the font size, and the gap between labels. */
+const GLYPH_WIDTH = 0.6
+const LABEL_GAP = 6
+
+/** Approximate rendered width of a category label, in SVG user units. */
+function labelWidth(label: string): number {
+  return label.length * CATEGORY_LABEL_SIZE * GLYPH_WIDTH
+}
+
+/**
+ * Show every `step`-th category label: the smallest step at which no two
+ * neighbouring shown labels overlap.
+ *
+ * The SVG scales as a whole, so whether labels collide is decided here in
+ * user units, not by the screen: 21 daily labels such as "06-23" need about
+ * 33 units each and get about 27, at any width. The hidden ones are still in
+ * the hover tooltip and the table view.
+ */
+export function categoryLabelStep(categories: readonly string[]): number {
+  const count = categories.length
+  const slot = plotWidth / Math.max(count, 1)
+  const fits = (step: number) => {
+    for (let i = 0; i + step < count; i += step) {
+      const apart = slot * step
+      if ((labelWidth(categories[i]) + labelWidth(categories[i + step])) / 2 + LABEL_GAP > apart) return false
+    }
+    return true
+  }
+  let step = 1
+  while (step < count && !fits(step)) step += 1
+  return step
+}
