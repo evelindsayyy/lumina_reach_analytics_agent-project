@@ -1,6 +1,6 @@
 [project]
 name = "agent_app"
-description = "Build one portfolio scaffold that touches AI, data, backend, business, finance and UX at once, then retarget it to any company in four hours."
+description = "AI analytics agent for paid search data, deployed on Amazon Bedrock AgentCore."
 version = "0.1.1"
 requires-python = ">=3.12,<4.0"
 
@@ -66,9 +66,7 @@ test = [
 
 # The app's own command line. `mise.toml` calls this name, not a file path, so
 # where a command's implementation lives can move without every task and habit
-# moving with it. Building and syncing the dataset are deliberately NOT here:
-# they belong to the teaching layer, which is deleted as whole directories, and
-# a shared entry point would leave a broken subcommand behind.
+# moving with it.
 [project.scripts]
 agent-app = "agent_app.cli:main"
 

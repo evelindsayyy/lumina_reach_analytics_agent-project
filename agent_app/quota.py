@@ -29,10 +29,10 @@ if T.TYPE_CHECKING:  # pragma: no cover
     from .config import Config
 
 
-#: Identifies this scaffold in a quota table it may share with other codebases.
+#: Identifies this app in a quota table it may share with other codebases.
 #: A constant rather than config: it is a fact about *this repository*, not the
 #: dataset it serves, so a dataset swap must not touch it.
-SCAFFOLD_ID = "learn-ba-agent-app-scaffold"
+APP_ID_PREFIX = "lumina-reach-analytics"
 
 #: The DynamoDB attribute names. Fixed on purpose -- see the module docstring.
 ATTR_INVOKE = "total_invoke"
@@ -72,7 +72,7 @@ class QuotaExceededError(RuntimeError):
 
 def get_app_id(config: "Config", now: datetime.datetime | None = None) -> str:
     """
-    Build the partition key: ``<scaffold>:<dataset>:<YYYY-MM>``.
+    Build the partition key: ``<app>:<dataset>:<YYYY-MM>``.
 
     A new month is a new row, so usage resets without anyone acting. ``:``
     separates the parts because neither a slug nor a schema name can contain
@@ -80,19 +80,19 @@ def get_app_id(config: "Config", now: datetime.datetime | None = None) -> str:
     """
     if now is None:
         now = datetime.datetime.now(datetime.timezone.utc)
-    return f"{SCAFFOLD_ID}:{config.schema_name}:{now.year:04d}-{now.month:02d}"
+    return f"{APP_ID_PREFIX}:{config.schema_name}:{now.year:04d}-{now.month:02d}"
 
 
 def get_user_app_id(config: "Config", user_id: str, now: datetime.datetime | None = None) -> str:
     """
-    The partition key of one user's row: ``<scaffold>:<dataset>:user:<id>:<YYYY-MM>``.
+    The partition key of one user's row: ``<app>:<dataset>:user:<id>:<YYYY-MM>``.
 
     ``user_id`` is the JWT ``sub``, a UUID in Cognito, so it cannot contain the
     ``:`` that separates the parts.
     """
     if now is None:
         now = datetime.datetime.now(datetime.timezone.utc)
-    return f"{SCAFFOLD_ID}:{config.schema_name}:user:{user_id}:{now.year:04d}-{now.month:02d}"
+    return f"{APP_ID_PREFIX}:{config.schema_name}:user:{user_id}:{now.year:04d}-{now.month:02d}"
 
 
 def _counter(item: dict, attr: str) -> int:

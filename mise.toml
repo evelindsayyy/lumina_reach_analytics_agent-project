@@ -46,9 +46,9 @@ run = "uv export --format requirements-txt --no-dev --no-emit-project --no-hashe
 # does nothing of its own: the behaviour lives in the CLI, and these tasks exist
 # so that `mise run` stays the single entry point a person has to remember.
 #
-# They call the console script rather than a path under `scripts/`: those
-# scripts are course material and will move, and a task pointing into them
-# breaks the day they do.
+# They call the console script rather than a path under `scripts/`: those are
+# ad-hoc helpers that may move, and a task pointing into them breaks the day
+# they do.
 #
 # The `cli-` prefix is what says these are wrappers. A task without it does its
 # own work; a task with it is a door onto a subcommand you can also run
@@ -140,8 +140,8 @@ depends = ["cov-python"]
 # top of each tree tags next-server, the postcss worker, and both runtimes for
 # free.
 #
-# The name is generic on purpose and may be shared with other projects grown
-# from this scaffold: what identifies a checkout is the *value*, which is this
+# The name is generic on purpose and may be shared with other projects: what
+# identifies a checkout is the *value*, which is this
 # checkout's path, so a second clone never kills the first one's servers.
 # kill-dev-servers.py reads the same name -- change it in both places or in
 # neither.

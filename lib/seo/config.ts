@@ -7,8 +7,7 @@ import { loadSite } from "@/lib/site/load"
  *
  * No `author`, `creator`, or profile image: this site presents a product, not a
  * person. Page metadata that names an individual (or uses their photo as the
- * social preview) is a leftover from the personal-portfolio template this
- * scaffolding came from, not something the app needs.
+ * social preview) is not something the app needs.
  */
 const site = loadSite()
 

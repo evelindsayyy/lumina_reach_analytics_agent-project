@@ -42,8 +42,8 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 
 # The env var `mise run dev` stamps on its servers.
 #
-# The name is deliberately generic, shared by every project grown from this
-# scaffold, because the *value* is what identifies a checkout: the marker
+# The name is deliberately generic and may be shared with other projects,
+# because the *value* is what identifies a checkout: the marker
 # matched below is `NAME=<absolute path>`, so two projects using the same
 # variable name still never see each other's processes. Naming it after the
 # dataset was the earlier arrangement and bought nothing, while guaranteeing the

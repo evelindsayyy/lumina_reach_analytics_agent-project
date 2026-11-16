@@ -8,7 +8,7 @@ command rather than a file path. That indirection is the point: where a check
 happens to live can change without every task, doc, and habit changing with it.
 
 **Only application commands belong here**, building the local warehouse file
-included: in this repo the dataset is part of the app, not a lesson.
+included: in this repo the dataset is part of the app.
 
 Argument parsing only; the work lives in the module each command calls. The
 parsing itself is ``fire``, which derives the interface from :class:`Cli` --

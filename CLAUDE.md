@@ -166,15 +166,14 @@ over an answer that is prose.
 
 **Comments and identifiers are English only.** Every comment, docstring, and
 name in the source tree (`.ts`, `.tsx`, `.py`) is written in English, even when
-the conversation that produced it was in Chinese. Chinese belongs in
-`.claude/skills/*-cn/` docs and in chat, never in code. Mixed-language comments
+the conversation that produced it was in Chinese. Chinese belongs in chat,
+never in code. Mixed-language comments
 make the codebase unreadable for anyone who joins later and unsearchable by
 keyword.
 
 **No author identity anywhere.** This site presents a product, not a person.
 There is no name, photo, contact link, or `author`/`creator` page metadata, and
-none should be added — that was portfolio scaffolding the app inherited and does
-not need.
+none should be added: the site is about the product.
 
 ### Swapping the Dataset
 
@@ -254,7 +253,7 @@ the build too, since the check script never parses the TOML's icon fields.
 
 | File | What It Does | When to Modify |
 |------|--------------|----------------|
-| `system-prompt.md` | System prompt for the BI agent | When changing agent behavior, adding tool usage instructions, or updating workflow guidelines. The five rendering sections are copied verbatim from `.claude/skills/swap-dataset-cn/ref/system-prompt-render-blocks.md`; change them in both places or neither. |
+| `system-prompt.md` | System prompt for the BI agent | When changing agent behavior, adding tool usage instructions, or updating workflow guidelines. The five rendering sections are the prompt's half of the render-block contract with the `render` quota in `data/site.toml` and the renderers in `components/chat/blocks/`; change them together. |
 | `site.toml` | Every sentence the UI says, the 4 capability cards, the 12 kickstart questions | When changing any user-visible string. Never inline copy in a component. |
 | `business-context.md` | The long-form explainer behind the home page | When the domain explanation changes. At most one mermaid diagram in the file. |
 | `sql-policy.toml` | Dataset rules for the SQL guardrails: sensitive columns, share columns (no `AVG`), conversion sources that must not be mixed | When the dataset's sensitive or ratio columns change. `cli-check-content` fails if it names a table or column the warehouse lacks. |
@@ -476,7 +475,7 @@ tests_python/
 ├── test_cli.py                     # Tests for cli.py
 ├── test_content_check.py           # Tests for content_check.py
 ├── test_sql_utils.py               # Tests for sql_utils.py (in-memory SQLite)
-├── test_source_code.py             # Tests for source_code.py (the TDD lesson)
+├── test_source_code.py             # Tests for source_code.py
 └── test_utils.py                   # Tests for utilities
 ```
 

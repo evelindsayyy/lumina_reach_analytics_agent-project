@@ -1,6 +1,6 @@
 # Model is left unset on purpose: setting it here hardcodes the model for
 # everyone and can't be changed from within the app/CLI afterward. Leaving
-# it commented out lets each student pick their own model there instead.
+# it commented out lets each developer pick their own model there instead.
 #
 # Uncomment the line below to default to gpt-5.6-luna, the lightweight/
 # high-concurrency tier of the gpt-5.6 family (vs. gpt-5.6-sol, the top-

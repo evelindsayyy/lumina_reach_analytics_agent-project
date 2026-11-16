@@ -1,7 +1,6 @@
 # User Settings
 *.egg-info/
 docs/source/**/index.md
-.claude/skills/lesson-smith*
 .claude/claude-code-message*
 .claude/settings.local.json
 tmp/

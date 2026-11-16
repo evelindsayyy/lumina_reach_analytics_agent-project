@@ -26,7 +26,7 @@ from agent_app.quota import ATTR_INPUT_TOKEN
 from agent_app.quota import ATTR_INVOKE
 from agent_app.quota import ATTR_OUTPUT_TOKEN
 from agent_app.quota import QuotaExceededError
-from agent_app.quota import SCAFFOLD_ID
+from agent_app.quota import APP_ID_PREFIX
 from agent_app.quota import check_quota
 from agent_app.quota import get_app_id
 from agent_app.quota import get_usage
@@ -69,14 +69,14 @@ def dynamodb(monkeypatch):
 
 
 class TestAppId:
-    def test_shape_is_scaffold_dataset_and_month(self):
+    def test_shape_is_app_dataset_and_month(self):
         """
         Three colon-separated parts, so one table can serve many deployments and
         a human reading the console can tell which row is whose.
         """
         moment = datetime.datetime(2026, 3, 9, tzinfo=datetime.timezone.utc)
-        scaffold, dataset, month = get_app_id(make_config(), moment).split(":")
-        assert scaffold == SCAFFOLD_ID
+        app, dataset, month = get_app_id(make_config(), moment).split(":")
+        assert app == APP_ID_PREFIX == "lumina-reach-analytics"
         assert dataset == "acme_widgets"
         assert month == "2026-03"
 
@@ -204,7 +204,7 @@ class TestDisabled:
     """
 
     def test_shipped_config_has_the_cap_disabled(self):
-        """A student cloning the repo must not need a DynamoDB table to chat."""
+        """A fresh clone must not need a DynamoDB table to chat."""
         assert Config().quota_enabled is False
 
     def test_check_is_a_no_op(self, dynamodb):
@@ -264,7 +264,7 @@ class TestPerUserCap:
         now = datetime.datetime(2026, 3, 9, tzinfo=datetime.timezone.utc)
         from agent_app.quota import get_user_app_id
 
-        assert get_user_app_id(make_config(), "u-1", now) == f"{SCAFFOLD_ID}:acme_widgets:user:u-1:2026-03"
+        assert get_user_app_id(make_config(), "u-1", now) == f"{APP_ID_PREFIX}:acme_widgets:user:u-1:2026-03"
         assert get_user_app_id(make_config(), "u-1", now) != get_app_id(make_config(), now)
 
     def test_under_the_cap_passes_and_reports_the_count(self, dynamodb):
