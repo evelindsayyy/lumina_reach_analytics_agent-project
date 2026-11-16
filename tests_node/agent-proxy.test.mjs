@@ -79,3 +79,19 @@ test("an error status from the runtime becomes a readable answer", async () => {
   const response = await proxyChat(CHAT, { url: "http://agent", fetchImpl });
   assert.equal(events(await response.text())[1].delta, RUNTIME_FAILED_MESSAGE);
 });
+
+test("a refused token reads as an expired session", async () => {
+  const { SESSION_EXPIRED_MESSAGE } = await import("../lib/agent-proxy.ts");
+  for (const status of [401, 403]) {
+    const fetchImpl = async () => new Response("{}", { status });
+    const response = await proxyChat(CHAT, { url: "http://agent", fetchImpl });
+    assert.equal(events(await response.text())[1].delta, SESSION_EXPIRED_MESSAGE);
+  }
+});
+
+test("the chat id is read from the request body", async () => {
+  const { chatIdOf } = await import("../lib/agent-proxy.ts");
+  assert.equal(chatIdOf(CHAT), "c1");
+  assert.equal(chatIdOf("not json"), "");
+  assert.equal(chatIdOf(JSON.stringify({ id: 7 })), "");
+});

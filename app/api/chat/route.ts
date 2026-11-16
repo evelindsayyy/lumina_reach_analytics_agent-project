@@ -1,8 +1,25 @@
-import { agentRuntimeUrl, proxyChat } from "@/lib/agent-proxy";
+import {
+  authConfigFromEnv,
+  invocationUrl,
+  jwtClaims,
+  runtimeSessionId,
+} from "@/lib/auth-core";
+import { isSecureOrigin, validAccessToken } from "@/lib/auth-server";
+import {
+  SIGN_IN_REQUIRED_MESSAGE,
+  agentRuntimeUrl,
+  chatIdOf,
+  proxyChat,
+  textStreamResponse,
+} from "@/lib/agent-proxy";
 
 // The chat UI's only backend call. The agent runs as its own runtime (locally
 // on port 8080, deployed on Amazon Bedrock AgentCore), so this route forwards
 // the request and streams the answer back. See lib/agent-proxy.ts.
+//
+// Deployed (COGNITO_* and AGENT_RUNTIME_ARN set), it forwards the signed-in
+// user's access token: AgentCore's JWT authorizer checks it before the agent
+// sees the request, so this tier holds no AWS credential and no secret.
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,8 +28,22 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 export async function POST(request: Request): Promise<Response> {
-  return proxyChat(await request.text(), {
-    url: agentRuntimeUrl(process.env),
+  const body = await request.text();
+  const auth = authConfigFromEnv(process.env);
+  const arn = process.env.AGENT_RUNTIME_ARN;
+  if (!auth || !arn) {
+    return proxyChat(body, { url: agentRuntimeUrl(process.env), signal: request.signal });
+  }
+
+  const token = await validAccessToken(auth, isSecureOrigin(new URL(request.url).origin));
+  if (!token) return textStreamResponse(SIGN_IN_REQUIRED_MESSAGE);
+  const sub = String(jwtClaims(token)?.sub ?? "anonymous");
+  return proxyChat(body, {
+    url: invocationUrl(arn),
+    headers: {
+      authorization: `Bearer ${token}`,
+      "x-amzn-bedrock-agentcore-runtime-session-id": runtimeSessionId(sub, chatIdOf(body) || "chat"),
+    },
     signal: request.signal,
   });
 }

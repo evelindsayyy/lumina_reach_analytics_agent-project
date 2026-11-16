@@ -5,6 +5,8 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Menu, X } from "lucide-react"
 
+import { AuthStatus } from "@/components/AuthStatus"
+
 /** One entry in the top bar. */
 interface NavItem {
   label: string
@@ -90,6 +92,7 @@ export default function Navigation({
                 </Link>
               )
             })}
+            <AuthStatus />
           </div>
 
           {/* Mobile Navigation Button */}
@@ -142,6 +145,7 @@ export default function Navigation({
                   </Link>
                 )
               })}
+              <AuthStatus className="px-4 py-3" />
             </div>
           </div>
         )}

@@ -28,6 +28,13 @@ export const RUNTIME_FAILED_MESSAGE =
   "The agent service failed on this request, so I could not answer. " +
   "Please try again; if it keeps failing, its log has the details.";
 
+export const SIGN_IN_REQUIRED_MESSAGE =
+  "Please sign in to ask a question: use **Sign in** at the top right. " +
+  "Each account gets a monthly allowance of questions.";
+
+export const SESSION_EXPIRED_MESSAGE =
+  "Your session has expired. Please sign in again (top right) and resend your question.";
+
 /** The agent runtime's invocation URL: `AGENT_RUNTIME_URL`, else the local one. */
 export function agentRuntimeUrl(
   env: Readonly<Record<string, string | undefined>>,
@@ -50,7 +57,7 @@ export function textStreamBody(text: string, id = "proxy-message"): string {
   ].join("");
 }
 
-function textStreamResponse(text: string): Response {
+export function textStreamResponse(text: string): Response {
   return new Response(textStreamBody(text), { status: 200, headers: SSE_HEADERS });
 }
 
@@ -61,6 +68,16 @@ export interface ProxyOptions {
   /** Aborts the upstream call when the browser goes away. */
   signal?: AbortSignal;
   fetchImpl?: typeof fetch;
+}
+
+/** The `id` of an AI SDK chat request (the conversation's id), or "" if it has none. */
+export function chatIdOf(body: string): string {
+  try {
+    const id = (JSON.parse(body) as { id?: unknown }).id;
+    return typeof id === "string" ? id : "";
+  } catch {
+    return "";
+  }
 }
 
 /**
@@ -82,6 +99,11 @@ export async function proxyChat(body: string, options: ProxyOptions): Promise<Re
     return textStreamResponse(RUNTIME_UNREACHABLE_MESSAGE);
   }
 
+  if (upstream.status === 401 || upstream.status === 403) {
+    // the runtime's JWT authorizer refused the token
+    console.error(`[agent-proxy] agent runtime refused the token: HTTP ${upstream.status}`);
+    return textStreamResponse(SESSION_EXPIRED_MESSAGE);
+  }
   if (!upstream.ok || !upstream.body) {
     console.error(`[agent-proxy] agent runtime answered HTTP ${upstream.status}`);
     return textStreamResponse(RUNTIME_FAILED_MESSAGE);

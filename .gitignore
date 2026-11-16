@@ -112,6 +112,8 @@ celerybeat.pid
 
 # Environments
 .env
+# Next.js local env: the web app's deployment settings, written by `agent-app web-env`
+.env*.local
 .envrc
 .venv
 env/

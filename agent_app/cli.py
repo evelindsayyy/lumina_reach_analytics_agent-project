@@ -239,6 +239,27 @@ class Cli:
 
         raise SystemExit(deployed_check.run(question or deployed_check.DEFAULT_QUESTION))
 
+    def web_env(self) -> None:
+        """
+        Write the web app's settings (Cognito domain and client, the agent's
+        runtime ARN) from the deployed stack to .env.local, and print them for
+        Vercel. One read of the stack; nothing is a secret.
+        """
+        import boto3
+
+        from agent_app.agentcore_project import deployed_check, web_env
+
+        try:
+            outputs = deployed_check.stack_outputs(boto3.Session(region_name=deployed_check.REGION))
+            values = web_env.web_env(outputs)
+        except Exception as e:
+            print(f"FAILED: {type(e).__name__}: {e}")
+            raise SystemExit(1)
+        web_env.write_env_local(values)
+        print(f"Wrote {web_env.PATH_ENV_LOCAL.name}. For Vercel, set these environment variables:\n")
+        print(web_env.render_env_file(values))
+        raise SystemExit(0)
+
     def ac_check_wheels(self) -> None:
         """
         Check each runtime's dependencies install the way ``agentcore deploy``

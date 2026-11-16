@@ -1,4 +1,5 @@
 import type { Config } from "tailwindcss"
+import tailwindcssAnimate from "tailwindcss-animate"
 
 // This app is light-only: there is no theme toggle, so no `darkMode` strategy
 // and no `dark:` variants anywhere in the tree.
@@ -92,7 +93,8 @@ const config: Config = {
        */
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  // an import, not require(): Node 24 loads this .ts file as an ES module
+  plugins: [tailwindcssAnimate],
 }
 
 export default config

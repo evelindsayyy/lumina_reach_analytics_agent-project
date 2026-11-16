@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { X } from "lucide-react";
 import { useState, useEffect } from "react";
 import type { SiteConfig } from "@/lib/site/schema";
+import { useAuth } from "@/hooks/use-auth";
 
 export function Chat({ site }: { site: SiteConfig }) {
   const [input, setInput] = useState("");
@@ -28,6 +29,8 @@ export function Chat({ site }: { site: SiteConfig }) {
   });
 
   const isLoading = status === "streaming" || status === "submitted";
+  const auth = useAuth();
+  const mustSignIn = auth.enabled && !auth.signedIn && !auth.loading;
 
   const handleSubmit = (e?: { preventDefault?: () => void }) => {
     e?.preventDefault?.();
@@ -114,6 +117,14 @@ export function Chat({ site }: { site: SiteConfig }) {
       </div>
 
       <div className="p-4 bg-white border-t border-slate-200">
+        {mustSignIn && (
+          <div className="mx-auto w-full md:max-w-3xl mb-3 flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+            <span>Sign in to ask a question. Each account gets a monthly allowance.</span>
+            <a href="/api/auth/login" className="shrink-0 font-medium px-4 py-2 bg-brand text-white rounded-lg hover:bg-brand-light transition-colors">
+              Sign in
+            </a>
+          </div>
+        )}
         <form className="flex mx-auto gap-2 w-full md:max-w-3xl">
           <MultimodalInput
             site={site}

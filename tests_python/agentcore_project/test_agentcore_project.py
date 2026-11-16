@@ -213,3 +213,30 @@ class TestDeployedCheck:
             "data: [DONE]\n\n"
         )
         assert dc.stream_text(text) == [("reasoning-delta", "think"), ("text-delta", "42")]
+
+
+class TestWebEnv:
+    OUTPUTS = {"CognitoDomain": "https://acme.auth.example", "WebClientId": "acmeclient", "AgentRuntimeArn": "arn:acme", "Other": "x"}
+
+    def test_maps_the_stack_outputs(self):
+        from agent_app.agentcore_project import web_env
+
+        assert web_env.web_env(self.OUTPUTS) == {
+            "COGNITO_DOMAIN": "https://acme.auth.example",
+            "COGNITO_CLIENT_ID": "acmeclient",
+            "AGENT_RUNTIME_ARN": "arn:acme",
+        }
+
+    def test_a_missing_output_is_named(self):
+        from agent_app.agentcore_project import web_env
+
+        with pytest.raises(KeyError, match="WebClientId"):
+            web_env.web_env({"CognitoDomain": "d", "AgentRuntimeArn": "a"})
+
+    def test_writes_a_dotenv_file(self, tmp_path):
+        from agent_app.agentcore_project import web_env
+
+        path = tmp_path / ".env.local"
+        web_env.write_env_local(web_env.web_env(self.OUTPUTS), path)
+        text = path.read_text()
+        assert 'COGNITO_CLIENT_ID="acmeclient"' in text and text.startswith("# Generated")
