@@ -19,6 +19,7 @@ Run it with ``python -m agent_app.runtimes.analytics_agent``.
 import httpx
 import pydantic
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
+from bedrock_agentcore.runtime.context import RequestContext
 from mcp.client.streamable_http import streamablehttp_client
 from starlette.exceptions import HTTPException
 from starlette.responses import StreamingResponse
@@ -35,6 +36,7 @@ from .common import AGENT_RUNTIME_NAME
 from .common import MCP_RUNTIME_NAME
 from .chat_turn import run_chat_turn
 from .mcp_connection import get_mcp_connection
+from .jwt_claims import user_id_from_headers
 
 
 #: How hard to retry a throttled model call: three attempts, about six seconds
@@ -99,13 +101,18 @@ def parse_request_body(payload: dict) -> RequestBody:
 
 
 @app.entrypoint
-def invoke(payload: dict) -> StreamingResponse:
+def invoke(payload: dict, context: RequestContext | None = None) -> StreamingResponse:
     """
     Answer the newest message of the conversation in ``payload``, as an AI SDK
     v5 UI message stream. A sync entrypoint, so the app runs it on a worker
     thread and concurrent requests do not block each other.
+
+    ``context`` carries the request headers. Deployed, its ``Authorization``
+    holds the caller's JWT, already verified by AgentCore; its ``sub`` is the
+    user the per-user cap counts.
     """
     request_body = parse_request_body(payload)
+    user_id = user_id_from_headers(context.request_headers if context else None)
     # No client while the cap is off: building one parses the DynamoDB service
     # model, on every request, for calls that return before using it.
     dynamodb_client = one.dynamodb_client() if one.config.quota_enabled else None
@@ -114,6 +121,7 @@ def invoke(payload: dict) -> StreamingResponse:
         new_agent=build_agent,
         dynamodb_client=dynamodb_client,
         config=one.config,
+        user_id=user_id,
     )
     return ai_sdk_streaming_response(reply.answer, reasoning_text=reply.reasoning)
 

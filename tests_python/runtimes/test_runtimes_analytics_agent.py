@@ -115,3 +115,36 @@ if __name__ == "__main__":
         "agent_app.runtimes.analytics_agent",
         preview=False,
     )
+
+
+def test_the_callers_sub_reaches_the_turn(client, monkeypatch):
+    """Deployed, AgentCore forwards the verified JWT in Authorization."""
+    import base64
+
+    seen = {}
+
+    def fake_turn(request_body, new_agent, dynamodb_client, config, user_id=None):
+        from agent_app.runtimes.chat_turn import TurnReply
+
+        seen["user_id"] = user_id
+        return TurnReply("ok")
+
+    monkeypatch.setattr(analytics_agent, "run_chat_turn", fake_turn)
+    payload = base64.urlsafe_b64encode(json.dumps({"sub": "user-9"}).encode()).rstrip(b"=").decode()
+    response = client.post("/invocations", json=CHAT, headers={"Authorization": f"Bearer h.{payload}.s"})
+    assert response.status_code == 200
+    assert seen["user_id"] == "user-9"
+
+
+def test_no_token_means_no_user(client, monkeypatch):
+    seen = {}
+
+    def fake_turn(request_body, new_agent, dynamodb_client, config, user_id=None):
+        from agent_app.runtimes.chat_turn import TurnReply
+
+        seen["user_id"] = user_id
+        return TurnReply("ok")
+
+    monkeypatch.setattr(analytics_agent, "run_chat_turn", fake_turn)
+    client.post("/invocations", json=CHAT)
+    assert seen["user_id"] is None

@@ -57,6 +57,18 @@ def get_app_id(config: "Config", now: datetime.datetime | None = None) -> str:
     return f"{SCAFFOLD_ID}:{config.schema_name}:{now.year:04d}-{now.month:02d}"
 
 
+def get_user_app_id(config: "Config", user_id: str, now: datetime.datetime | None = None) -> str:
+    """
+    The partition key of one user's row: ``<scaffold>:<dataset>:user:<id>:<YYYY-MM>``.
+
+    ``user_id`` is the JWT ``sub``, a UUID in Cognito, so it cannot contain the
+    ``:`` that separates the parts.
+    """
+    if now is None:
+        now = datetime.datetime.now(datetime.timezone.utc)
+    return f"{SCAFFOLD_ID}:{config.schema_name}:user:{user_id}:{now.year:04d}-{now.month:02d}"
+
+
 def _counter(item: dict, attr: str) -> int:
     """
     Read one counter out of a raw DynamoDB item.
@@ -166,3 +178,32 @@ def check_quota(
                 f"Monthly {label} cap reached for {app_id}: {usage[attr]} >= {cap}"
             )
     return usage
+
+
+def check_user_quota(
+    dynamodb_client: T.Any,
+    config: "Config",
+    user_id: str | None,
+) -> int | None:
+    """
+    Raise :class:`QuotaExceededError` if ``user_id`` has used this month's
+    invocations (``quota_max_invoke_per_user_per_month``).
+
+    Only invocations are capped per user: tokens are capped deployment-wide,
+    and a per-user token cap would refuse a long conversation halfway.
+
+    Returns the user's count, or None when the cap is off, there is no user
+    (local development), or the counter could not be read.
+    """
+    if not config.quota_enabled or not user_id:
+        return None
+    app_id = get_user_app_id(config, user_id)
+    try:
+        used = get_usage(dynamodb_client, config, app_id)[ATTR_INVOKE]
+    except Exception as e:
+        debug(f"[quota] user check failed, allowing request: {e}")
+        return None
+    cap = config.quota_max_invoke_per_user_per_month
+    if used >= cap:
+        raise QuotaExceededError(f"Monthly per-user invoke cap reached for {app_id}: {used} >= {cap}")
+    return used

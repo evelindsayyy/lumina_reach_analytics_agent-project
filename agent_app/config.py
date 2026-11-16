@@ -111,6 +111,11 @@ def read_private_key_pem() -> str | None:
     return None
 
 
+#: Names the SSM SecureString holding the Snowflake private key, in a deployed
+#: MCP runtime. See :meth:`Config.new_in_agentcore_runtime`.
+SNOWFLAKE_PRIVATE_KEY_SSM_PARAM_VAR = "SNOWFLAKE_PRIVATE_KEY_SSM_PARAM"
+
+
 #: Environment variable holding the credential for each API-key based provider.
 #: Bedrock is absent on purpose: it authenticates with AWS credentials, not a key.
 PROVIDER_API_KEY_ENV_VAR = {
@@ -175,6 +180,9 @@ class Config:
     quota_max_invoke_per_month: int = dataclasses.field(default=1000)
     quota_max_input_token_per_month: int = dataclasses.field(default=50_000_000)
     quota_max_output_token_per_month: int = dataclasses.field(default=10_000_000)
+    #: The per-user cap, on top of the deployment-wide ones above: one signed-in
+    #: user (the JWT ``sub``) may not spend the whole month's budget.
+    quota_max_invoke_per_user_per_month: int = dataclasses.field(default=30)
 
     def __post_init__(self):
         """
@@ -284,6 +292,9 @@ class Config:
             quota_max_output_token_per_month=(
                 get_env_int("QUOTA_MAX_OUTPUT_TOKEN_PER_MONTH") or 10_000_000
             ),
+            quota_max_invoke_per_user_per_month=(
+                get_env_int("QUOTA_MAX_INVOKE_PER_USER_PER_MONTH") or 30
+            ),
         )
         values.update(overrides)
         return cls(**values)
@@ -319,6 +330,33 @@ class Config:
         )
 
     @classmethod
+    def new_in_agentcore_runtime(cls, ssm_client=None) -> "Config":
+        """
+        Build config inside an AgentCore Runtime.
+
+        Settings arrive as the runtime's environment variables (``envVars`` in
+        ``agentcore.json``); ``.env.defaults`` ships in the CodeZip and fills
+        the rest. AWS credentials come from the runtime's execution role, so
+        none are passed.
+
+        The one secret, the Snowflake private key, is read from the SSM
+        SecureString named by ``SNOWFLAKE_PRIVATE_KEY_SSM_PARAM``. Only the MCP
+        runtime has that variable, and only its execution role may read the
+        parameter, so the agent runtime never holds the key.
+        """
+        load_env_files()
+        overrides = {}
+        param = get_env(SNOWFLAKE_PRIVATE_KEY_SSM_PARAM_VAR)
+        if param and not get_env("SNOWFLAKE_PRIVATE_KEY"):
+            if ssm_client is None:  # pragma: no cover - needs AWS
+                import boto3
+
+                ssm_client = boto3.client("ssm", region_name=get_env("AWS_REGION"))
+            response = ssm_client.get_parameter(Name=param, WithDecryption=True)
+            overrides["snowflake_private_key_pem"] = response["Parameter"]["Value"]
+        return cls.new_from_env_var(**overrides)
+
+    @classmethod
     def new(cls) -> "Config":
         """
         The entry point: detect the runtime, then build the config for it.
@@ -334,6 +372,8 @@ class Config:
             return cls.new_in_local_runtime()
         elif runtime.is_vercel():
             return cls.new_in_vercel_runtime()
+        elif runtime.is_agentcore():
+            return cls.new_in_agentcore_runtime()
         else:  # pragma: no cover
             raise RuntimeError(
                 "No Config factory for the current runtime. Add a branch here "

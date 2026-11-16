@@ -159,6 +159,24 @@ class TestFactories:
         finally:
             runtime.__dict__.pop("_is_vercel", None)
 
+    def test_new_dispatches_to_the_agentcore_factory(self, monkeypatch):
+        """The runtime signal comes from agentcore.json's envVars."""
+        from agent_app.runtime import IS_AGENTCORE_RUNTIME_VAR, IS_AGENTCORE_RUNTIME_VALUE
+
+        for name in ("_is_vercel", "_is_agentcore"):
+            runtime.__dict__.pop(name, None)
+        try:
+            monkeypatch.delenv("VERCEL", raising=False)
+            monkeypatch.setenv(IS_AGENTCORE_RUNTIME_VAR, IS_AGENTCORE_RUNTIME_VALUE)
+            seen = []
+            monkeypatch.setattr(Config, "new_in_agentcore_runtime", classmethod(lambda cls: seen.append(cls) or "ac"))
+            assert runtime.is_agentcore()
+            assert not runtime.is_local()
+            assert Config.new() == "ac"
+        finally:
+            for name in ("_is_vercel", "_is_agentcore"):
+                runtime.__dict__.pop(name, None)
+
     def test_placeholder_reads_as_unset(self, monkeypatch):
         """A .env copied from .env.example with "..." left in must not count."""
         monkeypatch.setenv("AWS_ACCESS_KEY_ID", "...")
@@ -352,3 +370,41 @@ class TestEnvReaders:
         assert get_env_int("X_PORT") is None
         monkeypatch.setenv("X_PORT", "not-a-number")
         assert get_env_int("X_PORT") is None
+
+
+class TestAgentCoreRuntime:
+    """
+    Inside AgentCore the one secret, the Snowflake key, comes from SSM, and
+    only when the runtime names the parameter (the MCP runtime does, the agent
+    does not).
+    """
+
+    class FakeSsm:
+        def __init__(self):
+            self.calls = []
+
+        def get_parameter(self, Name, WithDecryption):
+            self.calls.append((Name, WithDecryption))
+            return {"Parameter": {"Value": "-----BEGIN PRIVATE KEY-----acme"}}
+
+    def test_the_key_is_read_from_ssm_decrypted(self, monkeypatch):
+        from agent_app.config import SNOWFLAKE_PRIVATE_KEY_SSM_PARAM_VAR
+
+        monkeypatch.setenv(SNOWFLAKE_PRIVATE_KEY_SSM_PARAM_VAR, "/acme/snowflake-key")
+        monkeypatch.delenv("SNOWFLAKE_PRIVATE_KEY", raising=False)
+        ssm = self.FakeSsm()
+        config = Config.new_in_agentcore_runtime(ssm_client=ssm)
+        assert ssm.calls == [("/acme/snowflake-key", True)]
+        assert config.snowflake_private_key_pem.endswith("acme")
+
+    def test_no_parameter_means_no_ssm_call(self, monkeypatch):
+        from agent_app.config import SNOWFLAKE_PRIVATE_KEY_SSM_PARAM_VAR
+
+        monkeypatch.delenv(SNOWFLAKE_PRIVATE_KEY_SSM_PARAM_VAR, raising=False)
+        ssm = self.FakeSsm()
+        Config.new_in_agentcore_runtime(ssm_client=ssm)
+        assert ssm.calls == []
+
+    def test_the_per_user_cap_is_read(self, monkeypatch):
+        monkeypatch.setenv("QUOTA_MAX_INVOKE_PER_USER_PER_MONTH", "7")
+        assert Config.new_from_env_var().quota_max_invoke_per_user_per_month == 7

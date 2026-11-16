@@ -21,6 +21,8 @@ import dataclasses
 
 from ..utils import debug
 from ..quota import check_quota
+from ..quota import check_user_quota
+from ..quota import get_user_app_id
 from ..quota import increment_usage
 from ..quota import QuotaExceededError
 from ..agent_response import agent_error_message
@@ -47,6 +49,13 @@ QUOTA_EXCEEDED_MESSAGE = (
     "This demo runs on a monthly token budget, and it has been used up for this "
     "billing cycle. The chat will start working again when the budget resets at "
     "the beginning of next month. Thanks for trying it out."
+)
+
+#: Shown when one signed-in user has used their own share of the month.
+USER_QUOTA_EXCEEDED_MESSAGE = (
+    "You have used this month's questions for your account. Each account gets "
+    "a fixed number per month so that everyone trying the demo gets a turn; "
+    "yours reset at the beginning of next month."
 )
 
 #: An empty answer would stream an empty text block: a reasoning block with
@@ -88,6 +97,7 @@ def run_chat_turn(
     new_agent: AgentFactory,
     dynamodb_client,
     config: "Config",
+    user_id: str | None = None,
 ) -> TurnReply:
     """
     Answer the newest user message of ``request_body``.
@@ -101,6 +111,8 @@ def run_chat_turn(
         new_agent: builds the agent for this turn from the history.
         dynamodb_client: for the monthly spend cap (off unless configured).
         config: the app config.
+        user_id: who is asking (the JWT ``sub``), for the per-user cap. None
+            locally, where nobody signs in and only the deployment-wide caps apply.
     """
     question = get_last_user_message_text(request_body)
     if not question:
@@ -113,6 +125,11 @@ def run_chat_turn(
     except QuotaExceededError as e:
         debug(f"[Quota] blocked: {e}")
         return TurnReply(QUOTA_EXCEEDED_MESSAGE)
+    try:
+        check_user_quota(dynamodb_client, config, user_id)
+    except QuotaExceededError as e:
+        debug(f"[Quota] user blocked: {e}")
+        return TurnReply(USER_QUOTA_EXCEEDED_MESSAGE)
 
     history = request_body_to_agent_history(request_body)
     debug(f"[Agent] {len(history)} history messages")
@@ -137,6 +154,14 @@ def run_chat_turn(
         input_tokens=input_tokens,
         output_tokens=output_tokens,
     )
+    if user_id:
+        increment_usage(
+            dynamodb_client,
+            config,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            app_id=get_user_app_id(config, user_id),
+        )
 
     thinking, answer = parse_agent_response(agent.messages, start_index)
     debug(f"[Agent] thinking {len(thinking)} chars, answer {len(answer)} chars")

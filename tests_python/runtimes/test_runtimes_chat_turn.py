@@ -166,3 +166,47 @@ if __name__ == "__main__":
         "agent_app.runtimes.chat_turn",
         preview=False,
     )
+
+
+class TestPerUserQuota:
+    def test_a_user_over_their_cap_is_refused_before_any_agent(self, monkeypatch):
+        from agent_app.runtimes.chat_turn import USER_QUOTA_EXCEEDED_MESSAGE
+
+        def over(client, config, user_id):
+            raise QuotaExceededError("per-user")
+
+        monkeypatch.setattr(chat_turn, "check_user_quota", over)
+
+        def factory(history):  # pragma: no cover - the point is that it is not reached
+            raise AssertionError("must not be built")
+
+        reply = run_chat_turn(
+            conversation("How many campaigns?"), new_agent=factory, dynamodb_client=None, config=one.config, user_id="u-1"
+        )
+        assert reply.answer == USER_QUOTA_EXCEEDED_MESSAGE
+
+    def test_a_signed_in_turn_counts_for_the_deployment_and_the_user(self, monkeypatch):
+        calls = []
+        monkeypatch.setattr(
+            chat_turn,
+            "increment_usage",
+            lambda client, config, input_tokens, output_tokens, app_id=None: calls.append(app_id),
+        )
+        run_chat_turn(
+            conversation("How many campaigns?"),
+            new_agent=lambda history: StubAgent(history, replies=["Twelve."]),
+            dynamodb_client=None,
+            config=one.config,
+            user_id="u-1",
+        )
+        assert calls[0] is None  # the deployment-wide row
+        assert calls[1].endswith(":user:u-1:" + calls[1].rsplit(":", 1)[1])
+
+    def test_an_anonymous_turn_counts_once(self, metered):
+        run_chat_turn(
+            conversation("How many campaigns?"),
+            new_agent=lambda history: StubAgent(history, replies=["Twelve."]),
+            dynamodb_client=None,
+            config=one.config,
+        )
+        assert len(metered) == 1

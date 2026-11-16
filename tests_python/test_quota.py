@@ -255,3 +255,45 @@ if __name__ == "__main__":
         "agent_app.quota",
         preview=False,
     )
+
+
+class TestPerUserCap:
+    """One user (the JWT sub) may not spend the whole month's budget."""
+
+    def test_the_user_row_is_its_own_key(self):
+        now = datetime.datetime(2026, 3, 9, tzinfo=datetime.timezone.utc)
+        from agent_app.quota import get_user_app_id
+
+        assert get_user_app_id(make_config(), "u-1", now) == f"{SCAFFOLD_ID}:acme_widgets:user:u-1:2026-03"
+        assert get_user_app_id(make_config(), "u-1", now) != get_app_id(make_config(), now)
+
+    def test_under_the_cap_passes_and_reports_the_count(self, dynamodb):
+        from agent_app.quota import check_user_quota, get_user_app_id
+
+        config = make_config(quota_max_invoke_per_user_per_month=3)
+        increment_usage(dynamodb, config, 1, 1, invokes=2, app_id=get_user_app_id(config, "u-1"))
+        assert check_user_quota(dynamodb, config, "u-1") == 2
+
+    def test_at_the_cap_blocks_that_user_only(self, dynamodb):
+        from agent_app.quota import check_user_quota, get_user_app_id
+
+        config = make_config(quota_max_invoke_per_user_per_month=3)
+        increment_usage(dynamodb, config, 1, 1, invokes=3, app_id=get_user_app_id(config, "u-1"))
+        with pytest.raises(QuotaExceededError, match="per-user"):
+            check_user_quota(dynamodb, config, "u-1")
+        assert check_user_quota(dynamodb, config, "u-2") == 0
+
+    def test_no_user_or_cap_off_is_a_no_op(self, dynamodb):
+        from agent_app.quota import check_user_quota
+
+        assert check_user_quota(dynamodb, make_config(), None) is None
+        assert check_user_quota(None, make_config(quota_enabled=False, dynamodb_table_name_quota=None), "u-1") is None
+
+    def test_a_failed_read_lets_the_request_through(self, capsys):
+        from agent_app.quota import check_user_quota
+
+        class Broken:
+            def get_item(self, **kwargs):
+                raise RuntimeError("dynamodb down")
+
+        assert check_user_quota(Broken(), make_config(), "u-1") is None
