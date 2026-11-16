@@ -49,6 +49,30 @@ def _as_word_list(value: T.Any) -> list[str]:
     return [str(word).strip() for word in value if str(word).strip()]
 
 
+def _put_secure_string(name: str, value: str | None, missing_hint: str) -> None:
+    """
+    Write ``value`` to the SSM SecureString ``name`` if it changed, and exit.
+    The value is never printed, and it is compared after decryption, so a
+    rerun with the same secret writes nothing.
+    """
+    from agent_app.api import one
+
+    if not value:
+        print(f"FAILED: {missing_hint}")
+        raise SystemExit(1)
+    ssm = one.boto_ses.client("ssm")
+    try:
+        current = ssm.get_parameter(Name=name, WithDecryption=True)["Parameter"]["Value"]
+    except ssm.exceptions.ParameterNotFound:
+        current = None
+    if current == value:
+        print(f"Unchanged: SSM parameter {name}")
+        raise SystemExit(0)
+    ssm.put_parameter(Name=name, Value=value, Type="SecureString", Overwrite=True)
+    print(f"{'Updated' if current else 'Created'}: SSM SecureString {name}")
+    raise SystemExit(0)
+
+
 class Cli:
     """
     Application commands. One public method is one subcommand.
@@ -229,27 +253,30 @@ class Cli:
     def snowflake_key_deploy(self) -> None:
         """
         Write the Snowflake service user's private key to its SSM SecureString,
-        which only the MCP runtime's role may read (writes to AWS). Only when
-        it changed; the value is never printed.
+        which only the MCP runtime's role may read (writes to AWS).
         """
         from agent_app.api import one
         from agent_app.agentcore_project.settings import SNOWFLAKE_KEY_PARAM_NAME
 
-        pem = one.config.snowflake_private_key_pem
-        if not pem:
-            print("FAILED: no Snowflake private key; set SNOWFLAKE_PRIVATE_KEY_PATH in .env")
-            raise SystemExit(1)
-        ssm = one.boto_ses.client("ssm")
-        try:
-            current = ssm.get_parameter(Name=SNOWFLAKE_KEY_PARAM_NAME, WithDecryption=True)["Parameter"]["Value"]
-        except ssm.exceptions.ParameterNotFound:
-            current = None
-        if current == pem:
-            print(f"Unchanged: SSM parameter {SNOWFLAKE_KEY_PARAM_NAME}")
-            raise SystemExit(0)
-        ssm.put_parameter(Name=SNOWFLAKE_KEY_PARAM_NAME, Value=pem, Type="SecureString", Overwrite=True)
-        print(f"{'Updated' if current else 'Created'}: SSM SecureString {SNOWFLAKE_KEY_PARAM_NAME}")
-        raise SystemExit(0)
+        _put_secure_string(
+            SNOWFLAKE_KEY_PARAM_NAME,
+            one.config.snowflake_private_key_pem,
+            "no Snowflake private key; set SNOWFLAKE_PRIVATE_KEY_PATH in .env",
+        )
+
+    def anthropic_key_deploy(self) -> None:
+        """
+        Write the Anthropic API key from .env to its SSM SecureString, which
+        only the agent runtime's role may read (writes to AWS).
+        """
+        from agent_app.api import one
+        from agent_app.agentcore_project.settings import ANTHROPIC_KEY_PARAM_NAME
+
+        _put_secure_string(
+            ANTHROPIC_KEY_PARAM_NAME,
+            one.config.anthropic_api_key,
+            "no Anthropic API key; set ANTHROPIC_API_KEY in .env",
+        )
 
     def print_db_schema(self) -> None:
         """

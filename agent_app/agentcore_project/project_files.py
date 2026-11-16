@@ -17,7 +17,7 @@ import json
 from pathlib import Path
 
 from ..runtime import IS_AGENTCORE_RUNTIME_VAR, IS_AGENTCORE_RUNTIME_VALUE
-from ..config import SNOWFLAKE_PRIVATE_KEY_SSM_PARAM_VAR
+from ..config import ANTHROPIC_API_KEY_SSM_PARAM_VAR, SNOWFLAKE_PRIVATE_KEY_SSM_PARAM_VAR
 from ..runtimes.common import AGENT_RUNTIME_NAME, MCP_RUNTIME_NAME
 from . import settings as s
 
@@ -26,8 +26,12 @@ def runtime_env_vars(settings: s.DeploySettings) -> dict[str, dict[str, str]]:
     """
     Each runtime's environment, by runtime name. Disjoint on purpose: the
     agent gets the model and the quota and no warehouse setting at all; the
-    MCP server gets the warehouse and the name (not the value) of its key.
+    MCP server gets the warehouse. Each gets the name (never the value) of
+    only its own secret's parameter.
     """
+    agent_secret = (
+        {ANTHROPIC_API_KEY_SSM_PARAM_VAR: s.ANTHROPIC_KEY_PARAM_NAME} if settings.llm_provider == "anthropic" else {}
+    )
     common = {
         IS_AGENTCORE_RUNTIME_VAR: IS_AGENTCORE_RUNTIME_VALUE,
         "AWS_REGION": settings.region,
@@ -42,8 +46,9 @@ def runtime_env_vars(settings: s.DeploySettings) -> dict[str, dict[str, str]]:
         },
         AGENT_RUNTIME_NAME: {
             **common,
-            "LLM_PROVIDER": "bedrock",
+            "LLM_PROVIDER": settings.llm_provider,
             "LLM_MODEL_ID": settings.model_id,
+            **agent_secret,
             # the table's name arrives from the stack (addEnvironmentVariable)
             "QUOTA_ENABLED": "true",
         },
@@ -97,6 +102,8 @@ def build_app_config(settings: s.DeploySettings) -> dict:
         "agentRuntimeName": AGENT_RUNTIME_NAME,
         "mcpRuntimeName": MCP_RUNTIME_NAME,
         "snowflakeKeyParamName": s.SNOWFLAKE_KEY_PARAM_NAME,
+        "anthropicKeyParamName": s.ANTHROPIC_KEY_PARAM_NAME,
+        "agentUsesBedrock": settings.llm_provider == "bedrock",
         "cognitoDomainPrefix": settings.cognito_domain_prefix,
         "callbackUrls": [f"{o}{s.AUTH_CALLBACK_PATH}" for o in settings.web_origins],
         "logoutUrls": [f"{o}/" for o in settings.web_origins],

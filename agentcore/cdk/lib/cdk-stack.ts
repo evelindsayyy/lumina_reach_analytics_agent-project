@@ -16,6 +16,10 @@ export interface AppConfig {
   mcpRuntimeName: string;
   /** The SSM SecureString holding the Snowflake service user's private key. */
   snowflakeKeyParamName: string;
+  /** The SSM SecureString holding the Anthropic API key (used when the agent is not on Bedrock). */
+  anthropicKeyParamName: string;
+  /** Whether the agent's model is on Bedrock; if not, its role is denied Bedrock too. */
+  agentUsesBedrock: boolean;
   /** The Cognito managed login domain: https://<prefix>.auth.<region>.amazoncognito.com */
   cognitoDomainPrefix: string;
   /** Where the web app may send users back after sign-in and sign-out. */
@@ -36,6 +40,20 @@ export function readAppConfig(start: string = __dirname): AppConfig {
   return JSON.parse(fs.readFileSync(path.join(dir, 'app-config.json'), 'utf-8')) as AppConfig;
 }
 
+/** Every way to call a Bedrock model. */
+const BEDROCK_INVOKE_ACTIONS = [
+  'bedrock:InvokeModel',
+  'bedrock:InvokeModelWithResponseStream',
+  'bedrock:Converse',
+  'bedrock:ConverseStream',
+  'bedrock:CountTokens',
+];
+
+/** An explicit Deny, which no Allow elsewhere can override. */
+function deny(actions: string[], resources: string[]): iam.PolicyStatement {
+  return new iam.PolicyStatement({ effect: iam.Effect.DENY, actions, resources });
+}
+
 export interface AgentCoreStackProps extends StackProps {
   /** Props for the AgentCore application, produced by transformAgentCoreJson from agentcore/agentcore.json. */
   application: AgentCoreApplicationProps;
@@ -49,6 +67,7 @@ export interface AgentCoreStackProps extends StackProps {
  *   it. Its role alone reads the Snowflake key, and it is denied every Bedrock model call.
  * - AnalyticsAgent: the agent. CUSTOM_JWT inbound: AgentCore verifies the Cognito access token
  *   before a request arrives, and forwards Authorization so the agent can read the user's sub.
+ *   Its role alone reads the Anthropic key; it is denied Bedrock unless its model is there.
  * - Cognito: the user pool the web app signs users in with (managed login, code + PKCE).
  * - DynamoDB: the quota table, read and written by the agent only.
  */
@@ -130,28 +149,24 @@ export class AgentCoreStack extends Stack {
     // sets AGENTCORE_RUNTIME_ANALYTICSMCP_ARN on the agent. No other principal is granted it.
     mcp.bind(agent);
 
-    // --- Only the MCP runtime reads the warehouse key ---
-    const keyParamArn = `arn:${this.partition}:ssm:${this.region}:${this.account}:parameter${cfg.snowflakeKeyParamName}`;
-    mcp.grant(['ssm:GetParameter'], [keyParamArn]);
-    // The MCP server runs SQL and calls no model; the construct grants every runtime Bedrock
-    // invoke by default, so take it back from this one explicitly.
-    mcp.addToRolePolicy(
-      new iam.PolicyStatement({
-        effect: iam.Effect.DENY,
-        actions: [
-          'bedrock:InvokeModel',
-          'bedrock:InvokeModelWithResponseStream',
-          'bedrock:Converse',
-          'bedrock:ConverseStream',
-          'bedrock:CountTokens',
-        ],
-        resources: ['*'],
-      }),
-    );
-    // And the agent never reads it, even if a later grant would allow it.
-    agent.addToRolePolicy(
-      new iam.PolicyStatement({ effect: iam.Effect.DENY, actions: ['ssm:GetParameter*'], resources: [keyParamArn] }),
-    );
+    // --- Each secret is readable by exactly one runtime, and explicitly denied to the other ---
+    const paramArn = (name: string) => `arn:${this.partition}:ssm:${this.region}:${this.account}:parameter${name}`;
+    const snowflakeKeyArn = paramArn(cfg.snowflakeKeyParamName);
+    const anthropicKeyArn = paramArn(cfg.anthropicKeyParamName);
+    mcp.grant(['ssm:GetParameter'], [snowflakeKeyArn]);
+    mcp.addToRolePolicy(deny(['ssm:GetParameter*'], [anthropicKeyArn]));
+    agent.addToRolePolicy(deny(['ssm:GetParameter*'], [snowflakeKeyArn]));
+    if (!cfg.agentUsesBedrock) {
+      agent.grant(['ssm:GetParameter'], [anthropicKeyArn]);
+    }
+
+    // --- Bedrock only where a model is called ---
+    // The construct grants every runtime Bedrock invoke by default; take it back from the MCP
+    // server (it runs SQL and calls no model), and from the agent when its model is elsewhere.
+    mcp.addToRolePolicy(deny(BEDROCK_INVOKE_ACTIONS, ['*']));
+    if (!cfg.agentUsesBedrock) {
+      agent.addToRolePolicy(deny(BEDROCK_INVOKE_ACTIONS, ['*']));
+    }
 
     // --- The monthly quota: deployment-wide and per user, written by the agent only ---
     const quotaTable = new dynamodb.Table(this, 'QuotaTable', {

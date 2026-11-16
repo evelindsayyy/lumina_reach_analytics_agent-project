@@ -209,6 +209,10 @@ depends = ["ac-gen"]
 description = "🔑 Write the Snowflake service user's private key to its SSM SecureString, read only by the MCP runtime (writes to AWS)"
 run = ".venv/bin/agent-app snowflake-key-deploy"
 
+[tasks.anthropic-key-deploy]
+description = "🔑 Write the Anthropic API key from .env to its SSM SecureString, read only by the agent runtime (writes to AWS)"
+run = ".venv/bin/agent-app anthropic-key-deploy"
+
 [tasks.ac-deploy]
 description = "🚀 Deploy both runtimes, their IAM roles, Cognito and the quota table (writes to AWS)"
 run = "agentcore deploy --target dev --yes"

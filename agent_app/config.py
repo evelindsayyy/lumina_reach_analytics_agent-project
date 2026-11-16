@@ -111,9 +111,18 @@ def read_private_key_pem() -> str | None:
     return None
 
 
-#: Names the SSM SecureString holding the Snowflake private key, in a deployed
-#: MCP runtime. See :meth:`Config.new_in_agentcore_runtime`.
+#: Name the SSM SecureStrings of the deployed runtimes' secrets: the Snowflake
+#: private key (MCP runtime) and the Anthropic API key (agent runtime). See
+#: :meth:`Config.new_in_agentcore_runtime`.
 SNOWFLAKE_PRIVATE_KEY_SSM_PARAM_VAR = "SNOWFLAKE_PRIVATE_KEY_SSM_PARAM"
+ANTHROPIC_API_KEY_SSM_PARAM_VAR = "ANTHROPIC_API_KEY_SSM_PARAM"
+
+#: ``*_SSM_PARAM`` variable -> (the variable that would hold the value
+#: directly, and wins; the Config field it fills).
+SSM_SECRET_PARAM_VARS = {
+    SNOWFLAKE_PRIVATE_KEY_SSM_PARAM_VAR: ("SNOWFLAKE_PRIVATE_KEY", "snowflake_private_key_pem"),
+    ANTHROPIC_API_KEY_SSM_PARAM_VAR: ("ANTHROPIC_API_KEY", "anthropic_api_key"),
+}
 
 
 #: Environment variable holding the credential for each API-key based provider.
@@ -339,21 +348,23 @@ class Config:
         the rest. AWS credentials come from the runtime's execution role, so
         none are passed.
 
-        The one secret, the Snowflake private key, is read from the SSM
-        SecureString named by ``SNOWFLAKE_PRIVATE_KEY_SSM_PARAM``. Only the MCP
-        runtime has that variable, and only its execution role may read the
-        parameter, so the agent runtime never holds the key.
+        Secrets are read from the SSM SecureStrings their ``*_SSM_PARAM``
+        variable names (:data:`SSM_SECRET_PARAM_VARS`). Each runtime has only
+        its own: the MCP runtime the Snowflake key's, the agent runtime the
+        Anthropic key's, and each execution role may read only that parameter.
         """
         load_env_files()
         overrides = {}
-        param = get_env(SNOWFLAKE_PRIVATE_KEY_SSM_PARAM_VAR)
-        if param and not get_env("SNOWFLAKE_PRIVATE_KEY"):
+        for param_var, (value_var, field) in SSM_SECRET_PARAM_VARS.items():
+            param = get_env(param_var)
+            if not param or get_env(value_var):
+                continue
             if ssm_client is None:  # pragma: no cover - needs AWS
                 import boto3
 
                 ssm_client = boto3.client("ssm", region_name=get_env("AWS_REGION"))
             response = ssm_client.get_parameter(Name=param, WithDecryption=True)
-            overrides["snowflake_private_key_pem"] = response["Parameter"]["Value"]
+            overrides[field] = response["Parameter"]["Value"]
         return cls.new_from_env_var(**overrides)
 
     @classmethod

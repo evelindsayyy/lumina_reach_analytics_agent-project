@@ -390,7 +390,10 @@ class TestAgentCoreRuntime:
     def test_the_key_is_read_from_ssm_decrypted(self, monkeypatch):
         from agent_app.config import SNOWFLAKE_PRIVATE_KEY_SSM_PARAM_VAR
 
+        from agent_app.config import ANTHROPIC_API_KEY_SSM_PARAM_VAR
+
         monkeypatch.setenv(SNOWFLAKE_PRIVATE_KEY_SSM_PARAM_VAR, "/acme/snowflake-key")
+        monkeypatch.delenv(ANTHROPIC_API_KEY_SSM_PARAM_VAR, raising=False)
         monkeypatch.delenv("SNOWFLAKE_PRIVATE_KEY", raising=False)
         ssm = self.FakeSsm()
         config = Config.new_in_agentcore_runtime(ssm_client=ssm)
@@ -398,12 +401,33 @@ class TestAgentCoreRuntime:
         assert config.snowflake_private_key_pem.endswith("acme")
 
     def test_no_parameter_means_no_ssm_call(self, monkeypatch):
-        from agent_app.config import SNOWFLAKE_PRIVATE_KEY_SSM_PARAM_VAR
+        from agent_app.config import ANTHROPIC_API_KEY_SSM_PARAM_VAR, SNOWFLAKE_PRIVATE_KEY_SSM_PARAM_VAR
 
         monkeypatch.delenv(SNOWFLAKE_PRIVATE_KEY_SSM_PARAM_VAR, raising=False)
+        monkeypatch.delenv(ANTHROPIC_API_KEY_SSM_PARAM_VAR, raising=False)
         ssm = self.FakeSsm()
         Config.new_in_agentcore_runtime(ssm_client=ssm)
         assert ssm.calls == []
+
+    def test_the_anthropic_key_is_read_from_its_own_parameter(self, monkeypatch):
+        from agent_app.config import ANTHROPIC_API_KEY_SSM_PARAM_VAR, SNOWFLAKE_PRIVATE_KEY_SSM_PARAM_VAR
+
+        monkeypatch.setenv(ANTHROPIC_API_KEY_SSM_PARAM_VAR, "/acme/anthropic-key")
+        monkeypatch.delenv(SNOWFLAKE_PRIVATE_KEY_SSM_PARAM_VAR, raising=False)
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        ssm = self.FakeSsm()
+        config = Config.new_in_agentcore_runtime(ssm_client=ssm)
+        assert ssm.calls == [("/acme/anthropic-key", True)]
+        assert config.anthropic_api_key.endswith("acme")
+
+    def test_a_value_set_directly_wins(self, monkeypatch):
+        from agent_app.config import ANTHROPIC_API_KEY_SSM_PARAM_VAR
+
+        monkeypatch.setenv(ANTHROPIC_API_KEY_SSM_PARAM_VAR, "/acme/anthropic-key")
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "direct")
+        ssm = self.FakeSsm()
+        assert Config.new_in_agentcore_runtime(ssm_client=ssm).anthropic_api_key == "direct"
+        assert ("/acme/anthropic-key", True) not in ssm.calls
 
     def test_the_per_user_cap_is_read(self, monkeypatch):
         monkeypatch.setenv("QUOTA_MAX_INVOKE_PER_USER_PER_MONTH", "7")

@@ -122,17 +122,21 @@ One CDK stack (`agentcore/cdk/lib/cdk-stack.ts`), deployed by the AgentCore CLI:
 
 | Resource | Inbound | Its IAM role may | Its IAM role may not |
 | :--- | :--- | :--- | :--- |
-| `AnalyticsMcp` runtime (the data tools) | SigV4 only | read the Snowflake key's SSM parameter | call any Bedrock model (explicit Deny) |
-| `AnalyticsAgent` runtime (the agent) | a Cognito access token from the web client (JWT authorizer) | invoke `AnalyticsMcp` (`bind()`), call Bedrock, read/write the quota table | read the Snowflake key (explicit Deny) |
+| `AnalyticsMcp` runtime (the data tools) | SigV4 only | read the Snowflake key's SSM parameter | read the Anthropic key, call any Bedrock model (explicit Denies) |
+| `AnalyticsAgent` runtime (the agent) | a Cognito access token from the web client (JWT authorizer) | invoke `AnalyticsMcp` (`bind()`), read the Anthropic key's SSM parameter, read/write the quota table | read the Snowflake key; call Bedrock while its model is on the Anthropic API (explicit Denies) |
 | Cognito user pool | managed login, code + PKCE | | |
 | DynamoDB quota table | | | |
 
 Each runtime gets only its own environment: the agent has no `SNOWFLAKE_*`
-setting at all, and the MCP server gets the parameter's name, never the key.
+setting at all, and each runtime gets the name of its own secret's parameter,
+never a secret. `AGENTCORE_LLM_PROVIDER` in `.env.defaults` picks the agent's
+model: `anthropic` (the key in SSM) or `bedrock` (the role is the only
+credential; not available to an AWS account on the Free plan).
 
 ```bash
 mise run wh-snowflake-sync     # the warehouse
-mise run snowflake-key-deploy  # the key, to SSM (writes to AWS)
+mise run snowflake-key-deploy  # the warehouse key, to SSM (writes to AWS)
+mise run anthropic-key-deploy  # the model key, to SSM (writes to AWS)
 mise run ac-check-wheels       # every dependency has a Linux aarch64 wheel
 mise run ac-build              # package + synthesize, no AWS write
 mise run ac-deploy             # writes to AWS

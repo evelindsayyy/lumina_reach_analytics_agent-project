@@ -331,3 +331,34 @@ class TestSnowflakeKeyDeploy:
 
         monkeypatch.setattr(one.config, "snowflake_private_key_pem", None)
         assert self.run() == 1
+
+
+class TestAnthropicKeyDeploy:
+    def test_writes_its_own_parameter(self, fake_aws, monkeypatch, capsys):
+        import boto3
+
+        from agent_app.api import one
+        from agent_app.agentcore_project.settings import ANTHROPIC_KEY_PARAM_NAME
+
+        monkeypatch.setattr(one.config, "anthropic_api_key", "sk-ant-acme")
+        monkeypatch.setattr(one.config, "aws_region", "us-east-2")
+        one.__dict__.pop("boto_ses", None)
+        try:
+            with pytest.raises(SystemExit) as exc:
+                cli.Cli().anthropic_key_deploy()
+            assert exc.value.code == 0
+            out = capsys.readouterr().out
+            assert "Created" in out and "sk-ant" not in out
+            ssm = boto3.client("ssm", region_name="us-east-2")
+            assert ssm.get_parameter(Name=ANTHROPIC_KEY_PARAM_NAME, WithDecryption=True)["Parameter"]["Value"] == "sk-ant-acme"
+        finally:
+            one.__dict__.pop("boto_ses", None)
+
+    def test_needs_a_key(self, monkeypatch, capsys):
+        from agent_app.api import one
+
+        monkeypatch.setattr(one.config, "anthropic_api_key", None)
+        with pytest.raises(SystemExit) as exc:
+            cli.Cli().anthropic_key_deploy()
+        assert exc.value.code == 1
+        assert "ANTHROPIC_API_KEY" in capsys.readouterr().out

@@ -29,6 +29,7 @@ class FakeConfig:
 
 
 ENV = {
+    "AGENTCORE_LLM_PROVIDER": "bedrock",
     "AGENTCORE_LLM_MODEL_ID": "us.acme.model-v1",
     "COGNITO_DOMAIN_PREFIX": "acme-login",
     "WEB_ORIGINS": "http://localhost:3000, https://acme.example/ ",
@@ -44,11 +45,15 @@ class TestDeploySettings:
     def test_origins_are_trimmed(self):
         assert settings().web_origins == ("http://localhost:3000", "https://acme.example")
 
+    def test_an_unknown_provider_is_refused(self):
+        with pytest.raises(ValueError, match="AGENTCORE_LLM_PROVIDER"):
+            settings(AGENTCORE_LLM_PROVIDER="openai")
+
     def test_every_missing_setting_is_named(self):
         config = FakeConfig(snowflake_account=None)
         with pytest.raises(ValueError) as e:
             s.deploy_settings_from_env(config, {}.get, account_id="111122223333")
-        for name in ("SNOWFLAKE_ACCOUNT", "AGENTCORE_LLM_MODEL_ID", "COGNITO_DOMAIN_PREFIX", "WEB_ORIGINS"):
+        for name in ("SNOWFLAKE_ACCOUNT", "AGENTCORE_LLM_PROVIDER", "AGENTCORE_LLM_MODEL_ID", "COGNITO_DOMAIN_PREFIX", "WEB_ORIGINS"):
             assert name in str(e.value)
 
 
@@ -59,6 +64,21 @@ class TestRuntimeEnvVars:
         assert agent["LLM_PROVIDER"] == "bedrock"
         assert agent["LLM_MODEL_ID"] == "us.acme.model-v1"
         assert agent["QUOTA_ENABLED"] == "true"
+
+    def test_on_bedrock_the_agent_has_no_secret(self):
+        agent = pf.runtime_env_vars(settings())[AGENT_RUNTIME_NAME]
+        assert not [k for k in agent if k.endswith("_SSM_PARAM")]
+        assert pf.build_app_config(settings())["agentUsesBedrock"] is True
+
+    def test_on_anthropic_the_agent_gets_its_key_name_only(self):
+        st = settings(AGENTCORE_LLM_PROVIDER="Anthropic", AGENTCORE_LLM_MODEL_ID="claude-acme")
+        envs = pf.runtime_env_vars(st)
+        agent, mcp = envs[AGENT_RUNTIME_NAME], envs[MCP_RUNTIME_NAME]
+        assert agent["LLM_PROVIDER"] == "anthropic"
+        assert agent["ANTHROPIC_API_KEY_SSM_PARAM"] == s.ANTHROPIC_KEY_PARAM_NAME
+        assert "ANTHROPIC_API_KEY" not in agent
+        assert "ANTHROPIC_API_KEY_SSM_PARAM" not in mcp
+        assert pf.build_app_config(st)["agentUsesBedrock"] is False
 
     def test_the_mcp_server_gets_the_key_name_not_the_key(self):
         mcp = pf.runtime_env_vars(settings())[MCP_RUNTIME_NAME]

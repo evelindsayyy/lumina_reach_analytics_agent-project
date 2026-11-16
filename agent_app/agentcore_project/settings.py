@@ -20,6 +20,13 @@ RUNTIME_VERSION = "PYTHON_" + RUNTIME_PYTHON.replace(".", "_")
 #: The SSM SecureString of the Snowflake service user's private key. Written
 #: by ``agent-app snowflake-key-deploy``, read by the MCP runtime's role only.
 SNOWFLAKE_KEY_PARAM_NAME = "/lumina-reach-analytics/snowflake-private-key"
+#: The SSM SecureString of the Anthropic API key, read by the agent runtime's
+#: role only, when the agent's provider is ``anthropic``.
+ANTHROPIC_KEY_PARAM_NAME = "/lumina-reach-analytics/anthropic-api-key"
+
+#: The deployed agent's model providers: on Bedrock the runtime's role is the
+#: only credential; on the Anthropic API the key above is.
+DEPLOY_LLM_PROVIDERS = ("anthropic", "bedrock")
 
 DIR_AGENTCORE = path_enum.dir_project_root / "agentcore"
 PATH_AGENTCORE_JSON = DIR_AGENTCORE / "agentcore.json"
@@ -36,7 +43,8 @@ AUTH_CALLBACK_PATH = "/api/auth/callback"
 class DeploySettings:
     account_id: str
     region: str
-    model_id: str  #: The agent's Bedrock model (an inference profile ID).
+    llm_provider: str  #: One of :data:`DEPLOY_LLM_PROVIDERS`.
+    model_id: str  #: The agent's model, in that provider's naming.
     cognito_domain_prefix: str
     web_origins: tuple[str, ...]  #: Where the web app runs, e.g. ``http://localhost:3000``.
     snowflake: dict[str, str]  #: The ``SNOWFLAKE_*`` settings the MCP runtime connects with.
@@ -68,6 +76,7 @@ def deploy_settings_from_env(config, get_env, account_id: str) -> DeploySettings
     }
     values = {
         **snowflake,
+        "AGENTCORE_LLM_PROVIDER": get_env("AGENTCORE_LLM_PROVIDER"),
         "AGENTCORE_LLM_MODEL_ID": get_env("AGENTCORE_LLM_MODEL_ID"),
         "COGNITO_DOMAIN_PREFIX": get_env("COGNITO_DOMAIN_PREFIX"),
         "WEB_ORIGINS": get_env("WEB_ORIGINS"),
@@ -76,10 +85,14 @@ def deploy_settings_from_env(config, get_env, account_id: str) -> DeploySettings
     missing = [name for name, value in values.items() if not value]
     if missing:
         raise ValueError(f"Set these before generating the AgentCore project: {', '.join(missing)}")
+    provider = values["AGENTCORE_LLM_PROVIDER"].strip().lower()
+    if provider not in DEPLOY_LLM_PROVIDERS:
+        raise ValueError(f"AGENTCORE_LLM_PROVIDER must be one of {', '.join(DEPLOY_LLM_PROVIDERS)}, got {provider!r}")
     origins = tuple(o.strip().rstrip("/") for o in values["WEB_ORIGINS"].split(",") if o.strip())
     return DeploySettings(
         account_id=account_id,
         region=values["AWS_REGION"],
+        llm_provider=provider,
         model_id=values["AGENTCORE_LLM_MODEL_ID"],
         cognito_domain_prefix=values["COGNITO_DOMAIN_PREFIX"],
         web_origins=origins,
