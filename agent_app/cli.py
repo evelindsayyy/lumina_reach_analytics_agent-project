@@ -126,9 +126,11 @@ class Cli:
         the ``ALTER USER`` to run once in a Snowsight worksheet. Writes only
         to ``tmp/snowflake/``; the public key it prints is not a secret.
         """
-        from agent_app.config import get_env
+        from agent_app.config import get_env, load_env_files
         from agent_app.warehouse import snowflake_sync
 
+        # nothing here builds `one.config`, which is what loads .env elsewhere
+        load_env_files()
         admin_user = get_env("SNOWFLAKE_ADMIN_USER")
         if not admin_user:
             print("FAILED: set SNOWFLAKE_ADMIN_USER in .env first (see .env.example)")

@@ -201,7 +201,17 @@ class TestSnowflakeSync:
 
 
 class TestSnowflakeAdminKey:
+    def test_reads_env_files_first(self, monkeypatch):
+        """The value lives in .env, which nothing else on this path loads."""
+        loaded = []
+        monkeypatch.setattr("agent_app.config.load_env_files", lambda: loaded.append(True))
+        monkeypatch.setattr("agent_app.config.get_env", lambda name: None)
+        with pytest.raises(SystemExit):
+            cli.Cli().snowflake_admin_key()
+        assert loaded == [True]
+
     def test_needs_the_admin_user(self, monkeypatch, capsys):
+        monkeypatch.setattr("agent_app.config.load_env_files", lambda: None)
         monkeypatch.setattr("agent_app.config.get_env", lambda name: None)
         with pytest.raises(SystemExit) as exc:
             cli.Cli().snowflake_admin_key()
@@ -211,6 +221,7 @@ class TestSnowflakeAdminKey:
     def test_prints_the_alter_user(self, monkeypatch, capsys, tmp_path):
         from agent_app.warehouse import snowflake_sync
 
+        monkeypatch.setattr("agent_app.config.load_env_files", lambda: None)
         monkeypatch.setattr("agent_app.config.get_env", lambda name: "ME")
         monkeypatch.setattr(snowflake_sync, "DEFAULT_PATH_ADMIN_KEY", tmp_path / "admin.pem")
         with pytest.raises(SystemExit) as exc:
