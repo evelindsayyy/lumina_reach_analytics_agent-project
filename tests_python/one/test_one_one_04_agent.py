@@ -20,6 +20,15 @@ class TestDebugReportTool:
         assert path_enum.path_debug_report_md.read_text(encoding="utf-8") == content
         assert str(path_enum.path_debug_report_md) in result
 
+    def test_deployed_the_report_goes_to_the_log(self, monkeypatch, capsys):
+        """A runtime's code directory is read-only; its log (CloudWatch) is read."""
+        from agent_app.runtime import runtime
+
+        monkeypatch.setattr(runtime, "is_agentcore", lambda: True)
+        result = one.tool_write_debug_report(content="# Report\nacme")
+        assert result == "Debug report logged."
+        assert "[debug_report]\n# Report\nacme" in capsys.readouterr().out
+
 
 if __name__ == "__main__":
     from agent_app.tests import run_cov_test

@@ -379,6 +379,11 @@ class TestAgentCoreRuntime:
     does not).
     """
 
+    @pytest.fixture(autouse=True)
+    def no_env_files(self, monkeypatch):
+        """This machine's .env must not decide what the factory reads."""
+        monkeypatch.setattr("agent_app.config.load_env_files", lambda: None)
+
     class FakeSsm:
         def __init__(self):
             self.calls = []

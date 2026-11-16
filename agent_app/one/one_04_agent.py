@@ -15,6 +15,7 @@ from strands import tool
 from strands.models import BedrockModel
 
 from ..paths import path_enum
+from ..runtime import runtime
 from ..constants import LlmProviderEnum
 
 if T.TYPE_CHECKING:  # pragma: no cover
@@ -147,8 +148,14 @@ class AgentMixin:
         Returns:
             A confirmation message with the file path.
         """
-        # Returned, never raised: a read-only filesystem (a deployed runtime)
-        # must not end a turn whose answer is already written.
+        # Deployed, the code directory is read-only and a file in the microVM
+        # would reach no one: the report goes to the runtime's log
+        # (CloudWatch), where a debugging session can find it.
+        if runtime.is_agentcore():
+            print(f"[debug_report]\n{content}", flush=True)
+            return "Debug report logged."
+        # Returned, never raised: a read-only filesystem must not end a turn
+        # whose answer is already written.
         try:
             path_enum.dir_tmp.mkdir(parents=True, exist_ok=True)
             path_enum.path_debug_report_md.write_text(content, encoding="utf-8")

@@ -100,7 +100,9 @@ export class AgentCoreStack extends Stack {
     const webClient = userPool.addClient('WebClient', {
       // A browser app holds no secret: authorization code with PKCE.
       generateSecret: false,
-      authFlows: { userSrp: true },
+      // adminUserPassword: server-side sign-in for the deployed tests; it needs IAM
+      // (cognito-idp:AdminInitiateAuth), so it is not a door for the public.
+      authFlows: { userSrp: true, adminUserPassword: true },
       oAuth: {
         flows: { authorizationCodeGrant: true },
         scopes: [cognito.OAuthScope.OPENID, cognito.OAuthScope.EMAIL, cognito.OAuthScope.PROFILE],
