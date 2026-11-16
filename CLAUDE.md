@@ -41,6 +41,8 @@ agent_app/                   # Python package. Name is deliberately generic and
 ├── content_check.py         # `agent-app check-content`.
 ├── warehouse/
 │   ├── engines.py           #   DuckDB / Snowflake engines; finds the .duckdb file
+│   ├── snowflake_ddl.py     #   DuckDB catalog -> Snowflake DDL, grants, cost cap (pure)
+│   ├── snowflake_sync.py    #   `agent-app snowflake-sync`: key pair, setup, load, row counts
 │   └── dialect.py           #   Snowflake -> DuckDB transpile (sqlglot)
 ├── nl2sql/
 │   └── guardrails.py        #   AST guardrails every agent query passes
@@ -223,6 +225,7 @@ the build too, since the check script never parses the TOML's icon fields.
 | `utils.py` | Helpers with no project dependencies: `debug` (stderr, never stdout) and `match` (include/exclude patterns) | Same rule as `constants.py` — only what a *second* module needs. |
 | `sql_utils.py` | Pure functions for SQL execution and formatting. Owns one promise: a query run through `execute_sql_query` cannot change the database | When changing how SQL results are formatted. Every failure is *returned as text*, never raised — the caller is an LLM, and a traceback ends its turn. |
 | `warehouse/engines.py` | `find_duckdb_file`, `new_duckdb_engine` (read-only, `search_path` = `SCHEMA_NAME`), `new_snowflake_engine` (key-pair service user) | When changing how either warehouse is connected to. |
+| `warehouse/snowflake_ddl.py`, `warehouse/snowflake_sync.py` | The Snowflake copy of the DuckDB file: `read_catalog`, `render_*` (schema, account setup with the cost cap, read grants, load), and `run` (`mise run wh-snowflake-sync`, browser sign-in as `SNOWFLAKE_ADMIN_USER`, key pair reused from `tmp/snowflake/`) | When the deployed warehouse's objects, grants or cost cap change. A new DuckDB column type needs a `TYPE_MAP` entry; a Snowflake reserved name is refused on purpose. |
 | `warehouse/dialect.py` | `transpile_to_duckdb`: Snowflake SQL -> DuckDB, with sqlglot | When a Snowflake construct does not transpile. SQL is written in the Snowflake dialect everywhere — prompt, guardrails, `dataset/03-*` queries. |
 | `nl2sql/guardrails.py` | AST guardrails (sqlglot, Snowflake dialect): `PARSE_ERROR`, `MULTI_STATEMENT`, `NOT_SELECT`, `UNKNOWN_TABLE`, `SENSITIVE_COLUMN`, `UNKNOWN_COLUMN`, `CONVERSION_MIX`, `RATIO_AVG`; rewrites `CURRENT_DATE` to the data's reference date and adds a `LIMIT` | When adding a generic check. The table/column allowlist comes from reflection and the dataset rules from `data/sql-policy.toml`, so a dataset swap edits neither this module nor its tests. |
 | `ai_sdk_adapter.py` | Converts Vercel AI SDK messages <-> Strands Agent messages, and generates the SSE event stream back to the browser | When the frontend message format changes. **Not** when switching LLM provider — this file is provider-agnostic and must stay that way; provider code belongs in `one_04_agent.py`. |

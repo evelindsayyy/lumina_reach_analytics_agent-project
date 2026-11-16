@@ -157,3 +157,43 @@ if __name__ == "__main__":
         "agent_app.cli",
         preview=False,
     )
+
+
+class TestSnowflakeSync:
+    def test_missing_settings_fail_before_any_connection(self, monkeypatch, capsys):
+        def refuse(*args, **kwargs):
+            raise ValueError("Set these in .env first (see .env.example): SNOWFLAKE_ADMIN_USER")
+
+        def never(**kwargs):  # pragma: no cover - the point is that it is not reached
+            raise AssertionError("run() must not be called")
+
+        monkeypatch.setattr("agent_app.warehouse.snowflake_sync.settings_from_env", refuse)
+        monkeypatch.setattr("agent_app.warehouse.snowflake_sync.run", never)
+        with pytest.raises(SystemExit) as exc:
+            cli.Cli().snowflake_sync()
+        assert exc.value.code == 1
+        assert "SNOWFLAKE_ADMIN_USER" in capsys.readouterr().out
+
+    def test_the_exit_code_is_the_sync_result(self, monkeypatch):
+        from agent_app.warehouse import snowflake_sync
+
+        settings = snowflake_sync.SyncSettings(
+            account="acme-test",
+            admin_user="ME",
+            objects=snowflake_sync.ddl.SnowflakeObjects("ACME", "ACME_WH", "ACME_READER", "ACME_SVC", "ACME_WH_MONITOR"),
+            path_private_key=snowflake_sync.DEFAULT_PATH_PRIVATE_KEY,
+            credit_quota=2,
+        )
+        seen = {}
+
+        def fake_run(**kwargs):
+            seen.update(kwargs)
+            return 0
+
+        monkeypatch.setattr("agent_app.warehouse.snowflake_sync.settings_from_env", lambda *a: settings)
+        monkeypatch.setattr("agent_app.warehouse.snowflake_sync.run", fake_run)
+        with pytest.raises(SystemExit) as exc:
+            cli.Cli().snowflake_sync()
+        assert exc.value.code == 0
+        assert seen["objects"].monitor == "ACME_WH_MONITOR"
+        assert seen["path_duckdb"].suffix == ".duckdb"

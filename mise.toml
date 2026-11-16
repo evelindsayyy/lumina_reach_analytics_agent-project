@@ -76,6 +76,13 @@ run = ".venv/bin/agent-app gen-data"
 description = "🔌 Check this machine can reach the configured warehouse (SELECT 1)"
 run = ".venv/bin/agent-app test-db-conn"
 
+[tasks.wh-snowflake-sync]
+# The deployed warehouse is a copy of the local DuckDB file, never a second
+# source of truth: rerun this after every `gen-data`. You sign in through your
+# browser; the agent's service user has a key pair and no password.
+description = "❄️ Copy the DuckDB warehouse into Snowflake as you (browser sign-in), with the cost cap (writes to Snowflake)"
+run = ".venv/bin/agent-app snowflake-sync"
+
 [tasks.cli-print-db-schema]
 # The agent's entire picture of the database, in the compact encoding it is
 # actually shown. Worth looking at whenever an answer is wrong in a way that

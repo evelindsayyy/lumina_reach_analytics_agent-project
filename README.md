@@ -47,6 +47,11 @@ Three processes, each with one job, and the same three run locally and on
   `WAREHOUSE_ENGINE` switches between them. SQL is written in the Snowflake
   dialect everywhere. On DuckDB, sqlglot transpiles it just before it runs, so
   the prompt, the guardrails and the reference queries are written once.
+  `mise run wh-snowflake-sync` copies the DuckDB file into Snowflake (tables,
+  keys, views transpiled by sqlglot, every row count checked). It signs you in
+  through your browser and sets the cost cap: an X-Small warehouse that
+  suspends after 60 idle seconds, a 60-second statement timeout, and a resource
+  monitor that suspends the warehouse at its monthly credit quota.
 - **SQL guardrails** (`agent_app/nl2sql/guardrails.py`): every query is parsed
   into an AST and checked before it runs. Each rejection has a code and an
   actionable message the model uses to fix its own SQL:

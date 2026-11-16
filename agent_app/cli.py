@@ -22,6 +22,7 @@ step with it.
     agent-app check-content
     agent-app check-content --retired "patient,bed,ward"
     agent-app test-db-conn
+    agent-app snowflake-sync
     agent-app print-db-schema
 """
 
@@ -117,6 +118,39 @@ class Cli:
 
         print(f"OK: the warehouse answered {value}.")
         raise SystemExit(0)
+
+    def snowflake_sync(self) -> None:
+        """
+        Copy the local DuckDB warehouse into Snowflake, signed in as you
+        through your browser (writes to Snowflake).
+
+        Sets up the account first (an X-Small warehouse with a monthly credit
+        cap, the read-only role, the key-pair service user), then rebuilds the
+        schema, loads every table and checks each row count. Safe to rerun:
+        the schema is replaced, and an existing key pair is reused.
+        """
+        from agent_app.config import get_env, get_env_int
+        from agent_app.api import one
+        from agent_app.warehouse.engines import find_duckdb_file
+        from agent_app.warehouse import snowflake_sync
+
+        try:
+            settings = snowflake_sync.settings_from_env(one.config, get_env, get_env_int)
+            path_duckdb = find_duckdb_file()
+        except (ValueError, FileNotFoundError, RuntimeError) as e:
+            print(f"FAILED: {e}")
+            raise SystemExit(1)
+        raise SystemExit(
+            snowflake_sync.run(
+                account=settings.account,
+                admin_user=settings.admin_user,
+                objects=settings.objects,
+                schema=one.config.schema_name,
+                path_duckdb=path_duckdb,
+                path_private_key=settings.path_private_key,
+                credit_quota=settings.credit_quota,
+            )
+        )
 
     def print_db_schema(self) -> None:
         """
