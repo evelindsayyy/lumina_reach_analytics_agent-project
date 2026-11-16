@@ -17,6 +17,7 @@ from strands.models import BedrockModel
 from ..paths import path_enum
 from ..runtime import runtime
 from ..constants import LlmProviderEnum
+from ..prompt_cache import caching_model_class
 
 if T.TYPE_CHECKING:  # pragma: no cover
     from .one_00_main import One
@@ -84,7 +85,8 @@ class AgentMixin:
             return self.bedrock_model
 
         if provider == LlmProviderEnum.ANTHROPIC.value:
-            anthropic_model_class = load_strands_model_class("AnthropicModel", provider)
+            # Cached: each tool round resends the prompt, tools and conversation.
+            anthropic_model_class = caching_model_class(load_strands_model_class("AnthropicModel", provider))
             return anthropic_model_class(
                 client_args={"api_key": self.config.anthropic_api_key},
                 model_id=self.config.model_id,

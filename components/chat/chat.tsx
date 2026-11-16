@@ -119,7 +119,10 @@ export function Chat({ site }: { site: SiteConfig }) {
       <div className="p-4 bg-white border-t border-slate-200">
         {mustSignIn && (
           <div className="mx-auto w-full md:max-w-3xl mb-3 flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-            <span>Sign in to ask a question. Each account gets a monthly allowance.</span>
+            <span>
+              Sign in to ask your own questions (a few live ones per account each month).
+              The example questions replay recorded answers from the live agent, no sign-in needed.
+            </span>
             <a href="/api/auth/login" className="shrink-0 font-medium px-4 py-2 bg-brand text-white rounded-lg hover:bg-brand-light transition-colors">
               Sign in
             </a>

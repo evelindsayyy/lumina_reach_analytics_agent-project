@@ -40,6 +40,32 @@ ATTR_INPUT_TOKEN = "total_input_token"
 ATTR_OUTPUT_TOKEN = "total_output_token"
 
 
+#: What a cached input token costs relative to an uncached one, on the
+#: Anthropic API: writing to the cache costs a quarter more, reading a tenth.
+CACHE_WRITE_PRICE_FACTOR = 1.25
+CACHE_READ_PRICE_FACTOR = 0.1
+
+
+def billable_input_tokens(usage: dict) -> int:
+    """
+    A turn's input tokens counted at the price they cost, for the input cap.
+
+    With prompt caching most of a turn's input is cache reads, which the
+    provider reports apart from ``inputTokens`` and bills at a tenth. Counting
+    them in full would spend the budget ten times too fast; leaving them out
+    would let it overrun. ``usage`` is Strands' ``accumulated_usage``.
+    """
+
+    def count(key: str) -> float:
+        return float(usage.get(key) or 0)
+
+    return round(
+        count("inputTokens")
+        + CACHE_WRITE_PRICE_FACTOR * count("cacheWriteInputTokens")
+        + CACHE_READ_PRICE_FACTOR * count("cacheReadInputTokens")
+    )
+
+
 class QuotaExceededError(RuntimeError):
     """Raised when the current month's usage has hit a configured cap."""
 

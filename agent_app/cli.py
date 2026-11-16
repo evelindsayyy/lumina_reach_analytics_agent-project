@@ -23,6 +23,7 @@ step with it.
     agent-app check-content --retired "patient,bed,ward"
     agent-app test-db-conn
     agent-app ac-gen
+    agent-app record-demos
     agent-app snowflake-admin-key
     agent-app snowflake-sync
     agent-app print-db-schema
@@ -254,6 +255,18 @@ class Cli:
         from agent_app.agentcore_project import deployed_check
 
         raise SystemExit(deployed_check.run(question or deployed_check.DEFAULT_QUESTION))
+
+    def record_demos(self) -> None:
+        """
+        Ask the deployed agent every example question of data/site.toml and
+        write the answers to data/demo-answers.json, which the web app replays
+        at no cost (spends from the deployment's budget; resets the test
+        user's own allowance).
+        """
+        from agent_app.config import get_env
+        from agent_app.agentcore_project import demo_recorder
+
+        raise SystemExit(demo_recorder.run(get_env("AGENTCORE_LLM_MODEL_ID") or ""))
 
     def web_env(self) -> None:
         """

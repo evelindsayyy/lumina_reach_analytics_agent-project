@@ -108,6 +108,10 @@ class TestModelDispatch:
         assert model.kwargs["client_args"] == {"api_key": "k"}
         # Required by this provider and by no other.
         assert "max_tokens" in model.kwargs
+        # Every tool round resends the prompt, the tools and the conversation;
+        # caching makes the repeats cost a tenth.
+        assert isinstance(model, TestModelDispatch.FakeModel)
+        assert type(model).__name__ == "CachingFakeModel"
 
     def test_openai_targets_the_responses_endpoint(self, one_with):
         """

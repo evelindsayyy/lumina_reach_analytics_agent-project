@@ -46,6 +46,10 @@ class PathEnum:
     path_site_toml = dir_data / "site.toml"
     path_business_context_md = dir_data / "business-context.md"
 
+    # The deployed agent's answers to the example questions, recorded by
+    # ``agent-app record-demos`` and replayed by the web app at no cost.
+    path_demo_answers_json = dir_data / "demo-answers.json"
+
     # The dataset's SQL guardrail rules: sensitive columns, conversion sources,
     # share columns. What tables exist is reflected, never written here.
     path_sql_policy_toml = dir_data / "sql-policy.toml"

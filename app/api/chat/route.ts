@@ -7,11 +7,14 @@ import {
 import { isSecureOrigin, validAccessToken } from "@/lib/auth-server";
 import {
   SIGN_IN_REQUIRED_MESSAGE,
+  SSE_HEADERS,
   agentRuntimeUrl,
   chatIdOf,
   proxyChat,
   textStreamResponse,
 } from "@/lib/agent-proxy";
+import { demoStreamEvents, demoStreamResponse, findDemoAnswer, type DemoAnswers } from "@/lib/demo-answers";
+import recordedDemos from "@/data/demo-answers.json";
 
 // The chat UI's only backend call. The agent runs as its own runtime (locally
 // on port 8080, deployed on Amazon Bedrock AgentCore), so this route forwards
@@ -20,6 +23,11 @@ import {
 // Deployed (COGNITO_* and AGENT_RUNTIME_ARN set), it forwards the signed-in
 // user's access token: AgentCore's JWT authorizer checks it before the agent
 // sees the request, so this tier holds no AWS credential and no secret.
+//
+// Deployed, a new chat that asks one of the example questions replays the
+// answer recorded from the live agent instead (lib/demo-answers.ts): no
+// sign-in and no cost, so every visitor sees it work even after the month's
+// budget is spent. Locally every question is live.
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,6 +42,10 @@ export async function POST(request: Request): Promise<Response> {
   if (!auth || !arn) {
     return proxyChat(body, { url: agentRuntimeUrl(process.env), signal: request.signal });
   }
+
+  const demos = recordedDemos as DemoAnswers;
+  const demo = findDemoAnswer(body, demos);
+  if (demo) return demoStreamResponse(demoStreamEvents(demo, demos), SSE_HEADERS);
 
   const token = await validAccessToken(auth, isSecureOrigin(new URL(request.url).origin));
   if (!token) return textStreamResponse(SIGN_IN_REQUIRED_MESSAGE);

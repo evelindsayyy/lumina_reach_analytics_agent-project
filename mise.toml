@@ -222,6 +222,10 @@ depends = ["ac-gen"]
 description = "🧪 Ask the deployed agent a question with a Cognito token; check calls without one are refused (creates a test user once)"
 run = ".venv/bin/agent-app test-deployed"
 
+[tasks.ac-record-demos]
+description = "🎬 Record the deployed agent's answers to the example questions into data/demo-answers.json (spends ~12 questions of the budget)"
+run = ".venv/bin/agent-app record-demos"
+
 [tasks.web-env]
 description = "🌐 Write the web app's settings from the deployed stack to .env.local, and print them for Vercel (read only)"
 run = ".venv/bin/agent-app web-env"

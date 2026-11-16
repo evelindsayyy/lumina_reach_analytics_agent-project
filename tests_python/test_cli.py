@@ -390,3 +390,16 @@ class TestAnthropicKeyDeploy:
             cli.Cli().anthropic_key_deploy()
         assert exc.value.code == 1
         assert "ANTHROPIC_API_KEY" in capsys.readouterr().out
+
+
+class TestRecordDemos:
+    def test_records_with_the_deployed_model(self, monkeypatch):
+        seen = {}
+        monkeypatch.setenv("AGENTCORE_LLM_MODEL_ID", "claude-acme")
+        monkeypatch.setattr(
+            "agent_app.agentcore_project.demo_recorder.run", lambda model_id: seen.setdefault("model", model_id) and 0
+        )
+        with pytest.raises(SystemExit) as exc:
+            cli.Cli().record_demos()
+        assert exc.value.code == 0
+        assert seen["model"] == "claude-acme"

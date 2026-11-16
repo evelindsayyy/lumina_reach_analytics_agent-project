@@ -110,6 +110,17 @@ class TestAnswers:
         assert metered == [(7, 3)]
         assert built[0].closed
 
+    def test_cached_input_is_metered_at_its_price(self, metered):
+        usage = {"inputTokens": 100, "outputTokens": 3, "cacheWriteInputTokens": 800, "cacheReadInputTokens": 5000}
+        turn(conversation("Q"), lambda h: StubAgent(h, replies=["ok"], usage=usage))
+        assert metered == [(100 + 1000 + 500, 3)]
+
+    def test_a_spent_budget_points_to_the_recorded_examples(self):
+        """Every visitor can still see the agent work: the examples cost nothing."""
+        for message in (chat_turn.QUOTA_EXCEEDED_MESSAGE, chat_turn.USER_QUOTA_EXCEEDED_MESSAGE):
+            assert "example questions" in message
+            assert "recorded" in message
+
     def test_an_empty_answer_says_so(self, metered):
         reply = turn(conversation("Q"), lambda h: StubAgent(h, replies=["<thinking>hm</thinking>"]))
         assert reply.answer == EMPTY_ANSWER_MESSAGE

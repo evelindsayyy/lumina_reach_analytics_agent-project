@@ -29,8 +29,10 @@ export const RUNTIME_FAILED_MESSAGE =
   "Please try again; if it keeps failing, its log has the details.";
 
 export const SIGN_IN_REQUIRED_MESSAGE =
-  "Please sign in to ask a question: use **Sign in** at the top right. " +
-  "Each account gets a monthly allowance of questions.";
+  "Please sign in to ask your own question: use **Sign in** at the top right. " +
+  "Each account gets a few live questions a month. Without signing in, start a " +
+  "new chat and pick one of the example questions: each replays an answer " +
+  "recorded from the live agent.";
 
 export const SESSION_EXPIRED_MESSAGE =
   "Your session has expired. Please sign in again (top right) and resend your question.";

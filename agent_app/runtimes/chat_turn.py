@@ -20,6 +20,7 @@ import contextlib
 import dataclasses
 
 from ..utils import debug
+from ..quota import billable_input_tokens
 from ..quota import check_quota
 from ..quota import check_user_quota
 from ..quota import get_user_app_id
@@ -47,15 +48,17 @@ NO_MESSAGE_MESSAGE = "Error: No message content found in request."
 #: whole point is that this path spends nothing.
 QUOTA_EXCEEDED_MESSAGE = (
     "This demo runs on a monthly token budget, and it has been used up for this "
-    "billing cycle. The chat will start working again when the budget resets at "
-    "the beginning of next month. Thanks for trying it out."
+    "billing cycle, so I cannot answer new questions until it resets at the "
+    "beginning of next month. You can still open any of the example questions "
+    "on the start screen: each replays an answer recorded from this live agent."
 )
 
 #: Shown when one signed-in user has used their own share of the month.
 USER_QUOTA_EXCEEDED_MESSAGE = (
     "You have used this month's questions for your account. Each account gets "
-    "a fixed number per month so that everyone trying the demo gets a turn; "
-    "yours reset at the beginning of next month."
+    "a few per month so that everyone trying the demo gets a turn; yours reset "
+    "at the beginning of next month. Meanwhile, the example questions on the "
+    "start screen replay answers recorded from this live agent."
 )
 
 #: An empty answer would stream an empty text block: a reasoning block with
@@ -76,12 +79,12 @@ class TurnReply:
 
 def _usage_of(agent_result) -> tuple[int, int]:
     """
-    The (input, output) tokens of one turn. The agent is new for the turn, so
-    its accumulated usage is exactly this turn's.
+    The (input, output) tokens of one turn, cached input counted at its price.
+    The agent is new for the turn, so its accumulated usage is exactly this turn's.
     """
     usage = getattr(agent_result.metrics, "accumulated_usage", None) or {}
     return (
-        int(usage.get("inputTokens", 0) or 0),
+        billable_input_tokens(usage),
         int(usage.get("outputTokens", 0) or 0),
     )
 

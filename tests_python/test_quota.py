@@ -297,3 +297,24 @@ class TestPerUserCap:
                 raise RuntimeError("dynamodb down")
 
         assert check_user_quota(Broken(), make_config(), "u-1") is None
+
+
+class TestBillableInputTokens:
+    """With prompt caching, the input cap counts tokens at the price they cost."""
+
+    def test_uncached_input_counts_in_full(self):
+        from agent_app.quota import billable_input_tokens
+
+        assert billable_input_tokens({"inputTokens": 1000}) == 1000
+
+    def test_cache_writes_cost_more_and_reads_a_tenth(self):
+        from agent_app.quota import billable_input_tokens
+
+        usage = {"inputTokens": 1000, "cacheWriteInputTokens": 8000, "cacheReadInputTokens": 30000}
+        assert billable_input_tokens(usage) == 1000 + 10000 + 3000
+
+    def test_missing_or_null_counts_are_zero(self):
+        from agent_app.quota import billable_input_tokens
+
+        assert billable_input_tokens({}) == 0
+        assert billable_input_tokens({"inputTokens": None, "cacheReadInputTokens": None}) == 0
