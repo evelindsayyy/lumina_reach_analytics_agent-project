@@ -80,10 +80,12 @@ export const PreviewMessage = ({
 
         <div
           className={cn(
-            "flex flex-col gap-2 max-w-[85%] sm:max-w-[75%] p-4",
+            "flex flex-col gap-2 p-4 min-w-0",
+            // On a phone an answer takes the whole width beside the avatar:
+            // charts and tables need it more than the bubble shape does.
             message.role === "user"
-              ? "bg-primary text-white rounded-2xl rounded-br-md"
-              : "bg-white border border-border rounded-2xl rounded-bl-md"
+              ? "max-w-[85%] sm:max-w-[75%] bg-primary text-white rounded-2xl rounded-br-md"
+              : "max-w-[calc(100%-2.75rem)] sm:max-w-[75%] bg-white border border-border rounded-2xl rounded-bl-md"
           )}
         >
           {/* AI SDK v5: Use parts instead of content */}

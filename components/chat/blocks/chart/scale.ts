@@ -1,23 +1,63 @@
 /**
  * Axis maths, kept out of the component so it can be reasoned about on its own.
+ *
+ * The chart is drawn at the width it is shown at: the SVG's user space is the
+ * container's CSS pixels, so the 11px labels stay 11px on a phone instead of
+ * shrinking with a fixed-size picture. Everything below takes that geometry.
  */
 
-/** SVG user-space geometry. The chart scales with CSS; these stay constant. */
-export const GEOM = {
-  width: 640,
-  height: 300,
-  padLeft: 52,
-  padRight: 16,
-  padTop: 12,
-  padBottom: 40,
-} as const
+/** The width drawn before the container is measured (server render, first paint). */
+export const DEFAULT_WIDTH = 640
+/** Below this the plot has no room for its axes; the chart scales down instead. */
+export const MIN_WIDTH = 200
 
-export const plotLeft = GEOM.padLeft
-export const plotRight = GEOM.width - GEOM.padRight
-export const plotTop = GEOM.padTop
-export const plotBottom = GEOM.height - GEOM.padBottom
-export const plotWidth = plotRight - plotLeft
-export const plotHeight = plotBottom - plotTop
+/** Average glyph width as a share of the font size, for label widths. */
+const GLYPH_WIDTH = 0.6
+
+const MAX_HEIGHT = 300
+const MIN_HEIGHT = 200
+/** Height as a share of width on narrow screens, where 300px would be a tall strip. */
+const HEIGHT_RATIO = 0.62
+
+const PAD = { right: 12, top: 12, bottom: 40 } as const
+/** Room between the y tick labels and the plot, and their font size. */
+const TICK_GAP = 10
+const TICK_LABEL_SIZE = 11
+
+export interface Geometry {
+  width: number
+  height: number
+  plotLeft: number
+  plotRight: number
+  plotTop: number
+  plotBottom: number
+  plotWidth: number
+  plotHeight: number
+}
+
+/**
+ * The geometry of a chart `width` CSS pixels wide whose longest y tick label
+ * is `tickChars` characters: the left margin is sized to it, which on a phone
+ * is the difference between a plot and a sliver.
+ */
+export function chartGeometry(width: number = DEFAULT_WIDTH, tickChars = 6): Geometry {
+  const w = Number.isFinite(width) ? Math.max(MIN_WIDTH, Math.round(width)) : DEFAULT_WIDTH
+  const height = Math.round(Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, w * HEIGHT_RATIO)))
+  const plotLeft = Math.round(tickChars * TICK_LABEL_SIZE * GLYPH_WIDTH + TICK_GAP)
+  const plotRight = w - PAD.right
+  const plotTop = PAD.top
+  const plotBottom = height - PAD.bottom
+  return {
+    width: w,
+    height,
+    plotLeft,
+    plotRight,
+    plotTop,
+    plotBottom,
+    plotWidth: plotRight - plotLeft,
+    plotHeight: plotBottom - plotTop,
+  }
+}
 
 /**
  * Round a raw step up to a "nice" one so tick labels read as round numbers.
@@ -46,8 +86,11 @@ export interface YAxis {
  * zero exaggerates differences, which is the most common way a chart lies.
  * Negative values matter in this domain (a pricing gap can be negative), so the
  * axis grows downward from zero when it needs to.
+ *
+ * A short plot gets fewer ticks, so their labels keep their spacing.
  */
-export function buildYAxis(values: number[], targetTicks = 5): YAxis {
+export function buildYAxis(values: number[], geom: Geometry = chartGeometry()): YAxis {
+  const targetTicks = geom.plotHeight < 200 ? 4 : 5
   const lo = Math.min(0, ...values)
   const hi = Math.max(0, ...values)
 
@@ -65,7 +108,7 @@ export function buildYAxis(values: number[], targetTicks = 5): YAxis {
   const count = Math.round(range / step)
   for (let i = 0; i <= count; i++) ticks.push(min + i * step)
 
-  const y = (value: number) => plotBottom - ((value - min) / range) * plotHeight
+  const y = (value: number) => geom.plotBottom - ((value - min) / range) * geom.plotHeight
 
   return { min, max, ticks, y, zeroY: y(0) }
 }
@@ -77,16 +120,15 @@ export function formatTick(value: number): string {
 }
 
 /** Horizontal centre of a category slot. */
-export function categoryCenter(index: number, count: number): number {
-  const slot = plotWidth / count
-  return plotLeft + slot * index + slot / 2
+export function categoryCenter(index: number, count: number, geom: Geometry = chartGeometry()): number {
+  const slot = geom.plotWidth / count
+  return geom.plotLeft + slot * index + slot / 2
 }
 
-/** Font size of the category labels, in SVG user units. */
+/** Font size of the category labels, in SVG user units (CSS pixels). */
 export const CATEGORY_LABEL_SIZE = 11
 
-/** Average glyph width as a share of the font size, and the gap between labels. */
-const GLYPH_WIDTH = 0.6
+/** The gap between neighbouring category labels. */
 const LABEL_GAP = 6
 
 /** Approximate rendered width of a category label, in SVG user units. */
@@ -96,20 +138,18 @@ function labelWidth(label: string): number {
 
 /**
  * Show every `step`-th category label: the smallest step at which no two
- * neighbouring shown labels overlap.
+ * neighbouring shown labels overlap in a plot `plotWidth` wide.
  *
- * The SVG scales as a whole, so whether labels collide is decided here in
- * user units, not by the screen: 21 daily labels such as "06-23" need about
- * 33 units each and get about 27, at any width. The hidden ones are still in
- * the hover tooltip and the table view.
+ * Found in a recorded answer: 21 daily labels such as "06-23" need about 33
+ * units each and got about 27. A phone's narrower plot needs a larger step.
+ * The hidden labels are still in the hover tooltip and the table view.
  */
-export function categoryLabelStep(categories: readonly string[]): number {
+export function categoryLabelStep(categories: readonly string[], plotWidth: number): number {
   const count = categories.length
   const slot = plotWidth / Math.max(count, 1)
   const fits = (step: number) => {
     for (let i = 0; i + step < count; i += step) {
-      const apart = slot * step
-      if ((labelWidth(categories[i]) + labelWidth(categories[i + step])) / 2 + LABEL_GAP > apart) return false
+      if ((labelWidth(categories[i]) + labelWidth(categories[i + step])) / 2 + LABEL_GAP > slot * step) return false
     }
     return true
   }

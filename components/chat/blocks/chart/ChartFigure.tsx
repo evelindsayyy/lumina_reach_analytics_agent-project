@@ -1,20 +1,15 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 import type { ChartSpec } from "./schema"
 import {
-  GEOM,
+  CATEGORY_LABEL_SIZE,
   buildYAxis,
   categoryCenter,
-  formatTick,
-  plotBottom,
-  plotLeft,
-  plotRight,
-  plotTop,
-  plotWidth,
-  CATEGORY_LABEL_SIZE,
   categoryLabelStep,
+  chartGeometry,
+  formatTick,
 } from "./scale"
 
 /** Radius of the rounded data-end on a bar. */
@@ -64,17 +59,49 @@ function barPath(x: number, width: number, valueY: number, zeroY: number): strin
   ].join(" ")
 }
 
+/**
+ * The content width of the element `ref` is attached to, kept current. Null
+ * until measured (server render, first paint), and where ResizeObserver is
+ * missing; the chart then draws at the default width and scales.
+ */
+function useContentWidth<T extends HTMLElement>() {
+  const ref = useRef<T>(null)
+  const [width, setWidth] = useState<number | null>(null)
+  useEffect(() => {
+    const element = ref.current
+    if (!element || typeof ResizeObserver === "undefined") return
+    const observer = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width))
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
+  return [ref, width] as const
+}
+
 export function ChartFigure({ spec }: { spec: ChartSpec }) {
   const [hover, setHover] = useState<number | null>(null)
   const [showTable, setShowTable] = useState(false)
+  // Drawn at the width it is shown at, so a label is 11px on a phone too.
+  const [figureRef, measuredWidth] = useContentWidth<HTMLElement>()
 
   const { type, title, yLabel, categories, series } = spec
-  const axis = buildYAxis(series.flatMap((s) => s.values))
+  const values = series.flatMap((s) => s.values)
+  // The ticks depend on the height only, so a first pass sizes the left
+  // margin to their longest label and the second draws with it.
+  const width = measuredWidth ?? undefined
+  const tickChars = Math.max(...buildYAxis(values, chartGeometry(width)).ticks.map((t) => formatTick(t).length))
+  const geom = chartGeometry(width, tickChars)
+  const { plotLeft, plotTop, plotBottom, plotRight, plotWidth } = geom
+  const axis = buildYAxis(values, geom)
   const slot = plotWidth / categories.length
-  const labelStep = categoryLabelStep(categories)
+  const labelStep = categoryLabelStep(categories, plotWidth)
+  // Markers shrink with the slot, so a dense line on a phone stays a line.
+  const markerRadius = Math.max(2, Math.min(4, slot / 3))
 
   return (
-    <figure className="viz-root my-3 rounded-lg border border-slate-200 bg-[var(--viz-surface)] p-4">
+    <figure
+      ref={figureRef}
+      className="viz-root my-3 rounded-lg border border-slate-200 bg-[var(--viz-surface)] p-3 sm:p-4"
+    >
       {title && (
         <figcaption className="mb-1 text-sm font-semibold text-[var(--viz-ink)]">
           {title}
@@ -138,7 +165,7 @@ export function ChartFigure({ spec }: { spec: ChartSpec }) {
       ) : (
         <div className="relative">
           <svg
-            viewBox={`0 0 ${GEOM.width} ${GEOM.height}`}
+            viewBox={`0 0 ${geom.width} ${geom.height}`}
             className="w-full h-auto"
             role="img"
             aria-label={title ?? `${type} chart`}
@@ -177,7 +204,7 @@ export function ChartFigure({ spec }: { spec: ChartSpec }) {
               ci % labelStep === 0 ? (
                 <text
                   key={c}
-                  x={categoryCenter(ci, categories.length)}
+                  x={categoryCenter(ci, categories.length, geom)}
                   y={plotBottom + 16}
                   textAnchor="middle"
                   fontSize={CATEGORY_LABEL_SIZE}
@@ -197,7 +224,7 @@ export function ChartFigure({ spec }: { spec: ChartSpec }) {
                   <g key={s.name} fill={seriesColor(si, series.length)}>
                     {s.values.map((v, ci) => {
                       const groupLeft =
-                        categoryCenter(ci, categories.length) - groupWidth / 2
+                        categoryCenter(ci, categories.length, geom) - groupWidth / 2
                       const x = groupLeft + si * (barWidth + BAR_GAP)
                       return (
                         <path
@@ -216,7 +243,7 @@ export function ChartFigure({ spec }: { spec: ChartSpec }) {
                 const color = seriesColor(si, series.length)
                 const points = s.values.map(
                   (v, ci) =>
-                    [categoryCenter(ci, categories.length), axis.y(v)] as const
+                    [categoryCenter(ci, categories.length, geom), axis.y(v)] as const
                 )
                 return (
                   <g key={s.name}>
@@ -233,7 +260,7 @@ export function ChartFigure({ spec }: { spec: ChartSpec }) {
                         key={categories[ci]}
                         cx={x}
                         cy={y}
-                        r={4}
+                        r={markerRadius}
                         fill={color}
                         // A 2px surface ring keeps overlapping markers readable.
                         stroke="var(--viz-surface)"
@@ -264,7 +291,7 @@ export function ChartFigure({ spec }: { spec: ChartSpec }) {
             <div
               className="pointer-events-none absolute top-0 rounded-md border border-slate-200 bg-[var(--viz-surface)] px-2 py-1 text-xs shadow-sm"
               style={{
-                left: `${((plotLeft + slot * hover + slot / 2) / GEOM.width) * 100}%`,
+                left: `${((plotLeft + slot * hover + slot / 2) / geom.width) * 100}%`,
                 transform: "translateX(-50%)",
               }}
             >
