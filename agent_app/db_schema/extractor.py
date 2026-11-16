@@ -84,20 +84,34 @@ SQLALCHEMY_TYPE_MAPPING: dict[str, LLMTypeEnum] = {
     sa.Null.__visit_name__: LLMTypeEnum.NULL,
     sa.ARRAY.__visit_name__: LLMTypeEnum.STR,
     sa.TypeDecorator.__visit_name__: LLMTypeEnum.STR,  # PickleType, Interval, Variant
+    # Snowflake's own types (snowflake-sqlalchemy visit names). Its TIMESTAMP
+    # columns reflect as one of the three TIMESTAMP_* kinds, never as TIMESTAMP.
+    "TIMESTAMP_NTZ": LLMTypeEnum.TS,
+    "TIMESTAMP_LTZ": LLMTypeEnum.TS,
+    "TIMESTAMP_TZ": LLMTypeEnum.TS,
+    "DECFLOAT": LLMTypeEnum.DEC,
+    "VARIANT": LLMTypeEnum.STR,
+    "OBJECT": LLMTypeEnum.STR,
+    "SNOWFLAKE_ARRAY": LLMTypeEnum.STR,
+    "MAP": LLMTypeEnum.STR,
 }
 
 
-def sqlalchemy_type_to_llm_type(type_: TypeEngine) -> T.Union[LLMTypeEnum, str]:
+def sqlalchemy_type_to_llm_type(type_: TypeEngine) -> T.Optional[LLMTypeEnum]:
     """
-    Compress a SQLAlchemy column type into the LLM vocabulary.
+    Compress a SQLAlchemy column type into the LLM vocabulary, or ``None``
+    when the vocabulary has no entry for it.
 
-    An unmapped type degrades to the dialect's own spelling rather than to
-    nothing, so a schema the vocabulary does not cover is still usable.
+    ``None`` is not an error: the encoder then shows the column's own
+    spelling (``ColumnInfo.type``), so a schema the vocabulary does not cover
+    is still usable, with a longer label.
     """
+    # Snowflake has one exact numeric type: its integers reflect as
+    # NUMBER(38, 0), a DECIMAL with no fraction digits, which is an int.
+    if isinstance(type_, sa.Numeric) and not isinstance(type_, sa.Float) and getattr(type_, "scale", None) == 0:
+        return LLMTypeEnum.INT
     visit_name = getattr(type_, "__visit_name__", None)
-    if visit_name is None:  # pragma: no cover
-        return str(type_)
-    return SQLALCHEMY_TYPE_MAPPING.get(visit_name, str(type_))
+    return SQLALCHEMY_TYPE_MAPPING.get(visit_name) if visit_name else None
 
 
 def new_column_info(column: "sa.Column") -> ColumnInfo:

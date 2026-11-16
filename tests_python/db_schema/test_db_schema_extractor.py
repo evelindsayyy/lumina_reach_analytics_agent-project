@@ -88,7 +88,29 @@ class TestSqlalchemyTypeToLlmType:
         vocabulary, which is exactly the case this fallback exists for.
         """
         assert "INET" not in SQLALCHEMY_TYPE_MAPPING
-        assert sqlalchemy_type_to_llm_type(pg.INET()) == "INET"
+        assert sqlalchemy_type_to_llm_type(pg.INET()) is None
+
+    def test_an_unmapped_column_keeps_its_own_spelling(self):
+        """The None above must survive ColumnInfo's validation, not crash it."""
+        column = new_column_info(sa.Column("ip", pg.INET()))
+        assert column.llm_type is None
+        assert column.type == "INET"
+
+    def test_snowflake_types(self):
+        """What a Snowflake schema actually reflects as (found against a live account)."""
+        from snowflake.sqlalchemy import custom_types as sf
+
+        assert sqlalchemy_type_to_llm_type(sf.TIMESTAMP_NTZ()) is LLMTypeEnum.TS
+        assert sqlalchemy_type_to_llm_type(sf.TIMESTAMP_LTZ()) is LLMTypeEnum.TS
+        assert sqlalchemy_type_to_llm_type(sf.TIMESTAMP_TZ()) is LLMTypeEnum.TS
+        assert sqlalchemy_type_to_llm_type(sf.VARIANT()) is LLMTypeEnum.STR
+
+    def test_a_decimal_with_no_fraction_is_an_int(self):
+        """Snowflake's integers reflect as NUMBER(38, 0); money stays a decimal."""
+        assert sqlalchemy_type_to_llm_type(sa.DECIMAL(38, 0)) is LLMTypeEnum.INT
+        assert sqlalchemy_type_to_llm_type(sa.NUMERIC(38, 0)) is LLMTypeEnum.INT
+        assert sqlalchemy_type_to_llm_type(sa.DECIMAL(12, 2)) is LLMTypeEnum.DEC
+        assert sqlalchemy_type_to_llm_type(sa.DECIMAL()) is LLMTypeEnum.DEC
 
     def test_postgres_jsonb_is_mapped(self):
         """JSONB has no generic SQLAlchemy type, so it is keyed by name."""
