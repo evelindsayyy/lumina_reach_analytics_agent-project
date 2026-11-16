@@ -133,6 +133,12 @@ never a secret. `AGENTCORE_LLM_PROVIDER` in `.env.defaults` picks the agent's
 model: `anthropic` (the key in SSM) or `bedrock` (the role is the only
 credential; not available to an AWS account on the Free plan).
 
+Cold starts: reflecting the Snowflake schema takes about 30 s, so `ac-gen`
+does it once at build time and ships the result in the MCP runtime's CodeZip
+(`schema-snapshot.json`, used only if it matches the schema and engine). A
+cold MCP runtime then has its schema and a warehouse connection in about 2 s.
+Redeploy after `wh-snowflake-sync` so the snapshot follows the warehouse.
+
 ```bash
 mise run wh-snowflake-sync     # the warehouse
 mise run snowflake-key-deploy  # the warehouse key, to SSM (writes to AWS)

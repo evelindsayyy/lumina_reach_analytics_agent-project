@@ -31,6 +31,11 @@ class PathEnum:
     path_env = dir_project_root / ".env"
     path_env_defaults = dir_project_root / ".env.defaults"
 
+    # The deployed MCP runtime's build-time schema snapshot, written next to
+    # the package by ``agent-app ac-gen`` (see ``db_schema/snapshot.py``).
+    # Never present in a checkout, so local runs always reflect live.
+    path_schema_snapshot_json = dir_project_root / "schema-snapshot.json"
+
     # Authored content only -- copy, prompt, explainer, seed. Keeping it in one
     # directory is what makes a dataset swap a directory replacement rather than
     # a diff scattered across the repo.

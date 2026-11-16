@@ -117,7 +117,24 @@ if __name__ == "__main__":
 class TestWarmSchema:
     def test_warms_the_cached_schema(self, capsys):
         assert analytics_mcp.warm_schema() is True
-        assert "schema characters" in capsys.readouterr().out
+        assert "from reflection on duckdb" in capsys.readouterr().out
+
+    def test_a_shipped_snapshot_is_named_and_reflection_skipped(self, monkeypatch, tmp_path, capsys):
+        from agent_app.api import one
+        from agent_app.db_schema.snapshot import write_snapshot
+        from agent_app.one.one_00_main import One
+        from agent_app.paths import path_enum
+
+        path = tmp_path / "schema-snapshot.json"
+        write_snapshot(path, one.new_schema_snapshot())
+        monkeypatch.setattr(path_enum, "path_schema_snapshot_json", path)
+        fresh = One()
+        fresh.__dict__["config"] = one.config
+        monkeypatch.setattr(analytics_mcp, "one", fresh)
+        assert analytics_mcp.warm_schema() is True
+        assert "from the build-time snapshot" in capsys.readouterr().out
+        assert "reflected_metadata" not in fresh.__dict__
+        assert "engine" in fresh.__dict__  # the first query's connection is already open
 
     def test_a_warehouse_failure_is_logged_not_raised(self, monkeypatch, caplog):
         class Broken:

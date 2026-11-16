@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+import types
+
 import pytest
 
 from agent_app import cli
@@ -263,13 +265,39 @@ class TestAcGen:
             lambda config, get_env, account_id: seen.setdefault("account", account_id),
         )
         monkeypatch.setattr("agent_app.agentcore_project.codezip.export_requirements", lambda: ["mcp==1"])
-        monkeypatch.setattr("agent_app.agentcore_project.gen.generate_all", lambda st, req: seen.setdefault("all", req))
+        monkeypatch.setattr(
+            "agent_app.agentcore_project.gen.schema_snapshot",
+            lambda config, engine: types.SimpleNamespace(warehouse_engine=engine, table_columns={"widget": {"id"}}),
+        )
+        monkeypatch.setattr(
+            "agent_app.agentcore_project.gen.generate_all",
+            lambda st, req, snapshot: seen.setdefault("all", (req, snapshot)),
+        )
         monkeypatch.setattr("agent_app.agentcore_project.gen.generate_teardown", lambda st: seen.setdefault("down", True))
         with pytest.raises(SystemExit) as exc:
             cli.Cli().ac_gen(teardown=teardown)
         assert exc.value.code == 0
         assert seen["account"] == "123456789012"  # moto's account
         assert ("down" in seen) is teardown and ("all" in seen) is not teardown
+        if not teardown:
+            requirements, snapshot = seen["all"]
+            assert requirements == ["mcp==1"]
+            assert snapshot.warehouse_engine == "snowflake"  # of the engine the MCP runtime reads
+
+    def test_an_unreachable_warehouse_stops_the_deploy(self, monkeypatch, fake_aws, capsys):
+        """Better than shipping a runtime whose every cold start reflects for 30 s."""
+
+        def unreachable(config, engine):
+            raise RuntimeError("could not connect to Snowflake")
+
+        monkeypatch.setattr(
+            "agent_app.agentcore_project.settings.deploy_settings_from_env", lambda *args: None
+        )
+        monkeypatch.setattr("agent_app.agentcore_project.gen.schema_snapshot", unreachable)
+        with pytest.raises(SystemExit) as exc:
+            cli.Cli().ac_gen()
+        assert exc.value.code == 1
+        assert "could not connect to Snowflake" in capsys.readouterr().out
 
 
 class TestAcCheckWheels:

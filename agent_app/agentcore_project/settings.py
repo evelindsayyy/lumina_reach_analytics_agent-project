@@ -17,6 +17,9 @@ TARGET_NAME = "dev"
 #: The runtimes' Python, the version of this repo's ``.venv`` and ``uv.lock``.
 RUNTIME_PYTHON = "3.13"
 RUNTIME_VERSION = "PYTHON_" + RUNTIME_PYTHON.replace(".", "_")
+#: The warehouse the deployed MCP runtime reads, and so the engine its
+#: build-time schema snapshot is taken on.
+MCP_WAREHOUSE_ENGINE = "snowflake"
 #: The SSM SecureString of the Snowflake service user's private key. Written
 #: by ``agent-app snowflake-key-deploy``, read by the MCP runtime's role only.
 SNOWFLAKE_KEY_PARAM_NAME = "/lumina-reach-analytics/snowflake-private-key"

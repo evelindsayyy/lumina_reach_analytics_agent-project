@@ -219,3 +219,5 @@ agentcore/.cache/
 agentcore/.env*.local
 # The runtimes' CodeZip directories, assembled by `agent-app ac-gen`.
 build/agentcore/
+# Only ever written into build/agentcore/<MCP runtime>/, never in a checkout.
+/schema-snapshot.json

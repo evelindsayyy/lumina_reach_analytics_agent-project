@@ -40,7 +40,7 @@ def runtime_env_vars(settings: s.DeploySettings) -> dict[str, dict[str, str]]:
     return {
         MCP_RUNTIME_NAME: {
             **common,
-            "WAREHOUSE_ENGINE": "snowflake",
+            "WAREHOUSE_ENGINE": s.MCP_WAREHOUSE_ENGINE,
             **settings.snowflake,
             SNOWFLAKE_PRIVATE_KEY_SSM_PARAM_VAR: s.SNOWFLAKE_KEY_PARAM_NAME,
         },

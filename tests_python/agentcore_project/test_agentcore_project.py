@@ -14,6 +14,7 @@ from agent_app.agentcore_project import codezip
 from agent_app.agentcore_project import gen
 from agent_app.agentcore_project import project_files as pf
 from agent_app.agentcore_project import settings as s
+from agent_app.db_schema.snapshot import SchemaSnapshot
 from agent_app.runtimes.common import AGENT_RUNTIME_NAME, MCP_RUNTIME_NAME
 
 
@@ -34,6 +35,14 @@ ENV = {
     "COGNITO_DOMAIN_PREFIX": "acme-login",
     "WEB_ORIGINS": "http://localhost:3000, https://acme.example/ ",
 }
+
+
+SNAPSHOT = SchemaSnapshot(
+    schema_name="acme_widgets",
+    warehouse_engine="snowflake",
+    schema_str="snowflake Database acme_widgets(...)",
+    table_columns={"widget": frozenset({"widget_id"})},
+)
 
 
 def settings(**env_overrides) -> s.DeploySettings:
@@ -174,11 +183,33 @@ class TestGenerate:
         return tmp_path
 
     def test_generate_all(self, into_tmp):
-        gen.generate_all(settings(), ["mcp==1.28.1"])
+        gen.generate_all(settings(), ["mcp==1.28.1"], SNAPSHOT)
         assert len(json.loads((into_tmp / "agentcore" / "agentcore.json").read_text())["runtimes"]) == 2
         assert (into_tmp / "agentcore" / "app-config.json").is_file()
         for name in (MCP_RUNTIME_NAME, AGENT_RUNTIME_NAME):
             assert (into_tmp / "build" / "agentcore" / name / "main.py").is_file()
+
+    def test_only_the_mcp_server_ships_the_schema_snapshot(self, into_tmp):
+        """Next to the package, which is where the runtime's path_enum looks."""
+        from agent_app.db_schema.snapshot import load_snapshot
+        from agent_app.paths import path_enum
+
+        gen.generate_all(settings(), ["mcp==1.28.1"], SNAPSHOT)
+        dir_codezip = into_tmp / "build" / "agentcore"
+        name = path_enum.path_schema_snapshot_json.name
+        assert path_enum.path_schema_snapshot_json.parent == path_enum.dir_package.parent
+        assert load_snapshot(dir_codezip / MCP_RUNTIME_NAME / name, "acme_widgets", "snowflake") == SNAPSHOT
+        assert not (dir_codezip / AGENT_RUNTIME_NAME / name).exists()
+
+    def test_the_snapshot_is_of_the_engine_the_mcp_server_runs(self):
+        """Taken here on DuckDB, which needs no account; deployed it is Snowflake."""
+        from agent_app.api import one
+
+        snapshot = gen.schema_snapshot(one.config, "duckdb")
+        assert snapshot.warehouse_engine == "duckdb"
+        assert snapshot.schema_str.startswith("duckdb Database")
+        assert s.MCP_WAREHOUSE_ENGINE == "snowflake"
+        assert pf.runtime_env_vars(settings())[MCP_RUNTIME_NAME]["WAREHOUSE_ENGINE"] == s.MCP_WAREHOUSE_ENGINE
 
     def test_generate_teardown(self, into_tmp):
         gen.generate_teardown(settings())

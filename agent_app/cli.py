@@ -28,6 +28,7 @@ step with it.
     agent-app print-db-schema
 """
 
+import time
 import typing as T
 
 import fire
@@ -208,6 +209,10 @@ class Cli:
         directory (``build/agentcore/``). Reads the AWS account of your
         credentials (one read-only STS call); writes nothing to AWS.
 
+        Also snapshots the deployed warehouse schema (about 30 s on Snowflake)
+        into the MCP runtime, so its cold start skips reflection; an
+        unreachable warehouse stops here rather than deploying a slow runtime.
+
         :param teardown: write an empty project instead, whose deploy destroys
             the stack.
         """
@@ -216,6 +221,7 @@ class Cli:
         from agent_app.api import one
         from agent_app.config import get_env
         from agent_app.agentcore_project import codezip, gen
+        from agent_app.agentcore_project.settings import MCP_WAREHOUSE_ENGINE
         from agent_app.agentcore_project.settings import deploy_settings_from_env
 
         try:
@@ -226,8 +232,18 @@ class Cli:
             raise SystemExit(1)
         if teardown:
             gen.generate_teardown(settings)
-        else:
-            gen.generate_all(settings, codezip.export_requirements())
+            raise SystemExit(0)
+        started = time.monotonic()
+        try:
+            snapshot = gen.schema_snapshot(one.config, MCP_WAREHOUSE_ENGINE)
+        except Exception as e:
+            print(f"FAILED: could not snapshot the {MCP_WAREHOUSE_ENGINE} schema: {type(e).__name__}: {e}")
+            raise SystemExit(1)
+        print(
+            f"Snapshot of {one.config.schema_name!r} on {MCP_WAREHOUSE_ENGINE}: "
+            f"{len(snapshot.table_columns)} tables and views in {time.monotonic() - started:.1f} s"
+        )
+        gen.generate_all(settings, codezip.export_requirements(), snapshot)
         raise SystemExit(0)
 
     def test_deployed(self, question: str = "") -> None:

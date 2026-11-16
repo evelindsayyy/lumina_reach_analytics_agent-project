@@ -78,21 +78,29 @@ def execute_sql_query(sql: str) -> str:
 
 def warm_schema() -> bool:
     """
-    Reflect and encode the schema now, so the first question does not pay for
-    it, and log the outcome. A warehouse that cannot be reached is logged with
-    the reason and returns False: the tool call will try again, and fail with
-    the same reason in front of the agent.
+    Load the schema and the guardrail policy now, then open the warehouse
+    connection the first query will reuse, so the first question pays for
+    none of it; log where the schema came from and how long it took.
+
+    Deployed, the schema comes from the build-time snapshot in a moment;
+    without one, it is reflected (about 30 s on a cold Snowflake). A warehouse
+    that cannot be reached is logged with the reason and returns False: the
+    tool call will try again, and fail with the same reason in front of the agent.
     """
     started = time.monotonic()
     try:
         schema = one.database_schema_str
+        policy = one.guardrail_policy
+        with one.engine.connect():
+            pass
     except Exception:
         logger.exception(f"{MCP_RUNTIME_NAME}: schema warm-up failed")
         return False
+    source = "the build-time snapshot" if one.schema_snapshot else f"reflection on {one.config.warehouse_engine}"
     print(
-        f"{MCP_RUNTIME_NAME}: {len(one.reflected_metadata.tables)} tables and views "
-        f"of {one.config.schema_name!r} on {one.config.warehouse_engine} "
-        f"({len(schema):,} schema characters) in {time.monotonic() - started:.1f} s",
+        f"{MCP_RUNTIME_NAME}: {len(policy.table_columns)} tables and views of "
+        f"{one.config.schema_name!r} ({len(schema):,} schema characters) from {source}, "
+        f"connected, in {time.monotonic() - started:.1f} s",
         flush=True,
     )
     return True
@@ -102,10 +110,11 @@ def main():  # pragma: no cover - blocks until stopped
     """
     Serve, blocking until stopped, with the schema warming on a side thread.
 
-    Not warmed before serving: on Snowflake, reflection takes about half a
-    minute when the warehouse has to resume, and a runtime that does not answer
-    while it starts looks dead to its host. A call that arrives first waits for
-    the same reflection, which the agent's MCP client timeout allows for.
+    Not warmed before serving: even from the snapshot, signing in to Snowflake
+    takes a moment, and without a snapshot reflection takes about half a
+    minute; a runtime that does not answer while it starts looks dead to its
+    host. A call that arrives first waits for the same work, which the agent's
+    MCP client timeout allows for.
     """
     threading.Thread(target=warm_schema, name="warm-schema", daemon=True).start()
     print(

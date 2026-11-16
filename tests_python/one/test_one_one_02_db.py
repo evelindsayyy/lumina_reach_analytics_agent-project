@@ -120,6 +120,55 @@ class TestExecuteSqlQuery:
         assert result.startswith("Error executing query")
 
 
+class TestSchemaSnapshot:
+    """A deployed MCP runtime reads its schema from a build-time snapshot."""
+
+    @pytest.fixture
+    def shipped(self, monkeypatch, tmp_path):
+        """A snapshot file where the runtime looks for one, and a fresh One."""
+        from agent_app.db_schema.snapshot import write_snapshot
+        from agent_app.one.one_00_main import One
+        from agent_app.paths import path_enum
+
+        path = tmp_path / "schema-snapshot.json"
+        monkeypatch.setattr(path_enum, "path_schema_snapshot_json", path)
+
+        def ship(snapshot) -> "One":
+            write_snapshot(path, snapshot)
+            fresh = One()
+            fresh.__dict__["config"] = one.config
+            return fresh
+
+        return ship
+
+    def test_locally_there_is_none(self):
+        assert one.schema_snapshot is None
+
+    def test_a_new_snapshot_is_what_reflection_gives(self):
+        from agent_app.nl2sql.guardrails import reflect_table_columns
+
+        snapshot = one.new_schema_snapshot()
+        assert snapshot.schema_name == one.config.schema_name
+        assert snapshot.warehouse_engine == "duckdb"
+        assert snapshot.schema_str == one.database_schema_str
+        assert snapshot.table_columns == reflect_table_columns(one.reflected_metadata)
+
+    def test_a_shipped_snapshot_replaces_reflection(self, shipped):
+        import dataclasses
+
+        fresh = shipped(dataclasses.replace(one.new_schema_snapshot(), schema_str="FROM THE SNAPSHOT"))
+        assert fresh.database_schema_str == "FROM THE SNAPSHOT"
+        assert "daily_stats" in fresh.guardrail_policy.table_columns
+        assert "reflected_metadata" not in fresh.__dict__  # the warehouse was never asked
+
+    def test_a_snapshot_of_another_engine_is_not_used(self, shipped):
+        import dataclasses
+
+        fresh = shipped(dataclasses.replace(one.new_schema_snapshot(), warehouse_engine="snowflake"))
+        assert fresh.schema_snapshot is None
+        assert fresh.database_schema_str == one.database_schema_str
+
+
 if __name__ == "__main__":
     from agent_app.tests import run_cov_test
 

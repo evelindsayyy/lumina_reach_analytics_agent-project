@@ -11,6 +11,8 @@ from ..constants import DbTypeEnum, WarehouseEngineEnum
 from ..db_schema.api import new_schema_info
 from ..db_schema.api import new_database_info
 from ..db_schema.api import encode_database_info
+from ..db_schema.snapshot import SchemaSnapshot
+from ..db_schema.snapshot import load_snapshot
 from ..nl2sql.guardrails import GuardrailError
 from ..nl2sql.guardrails import GuardrailPolicy
 from ..nl2sql.guardrails import load_policy
@@ -83,10 +85,40 @@ class DbMixin:
         return metadata
 
     @cached_property
+    def schema_snapshot(self: "One") -> SchemaSnapshot | None:
+        """
+        The build-time snapshot a deployed MCP runtime ships with, when it is
+        one of this schema on this engine. None locally: there is no file.
+        """
+        return load_snapshot(
+            path_enum.path_schema_snapshot_json,
+            schema_name=self.config.schema_name,
+            warehouse_engine=self.config.warehouse_engine,
+        )
+
+    @cached_property
     def database_schema_str(self: "One") -> str:
         """
-        The database schema, encoded in the compact format the agent reads.
+        The database schema, encoded in the compact format the agent reads:
+        from the shipped snapshot if there is one, else reflected live.
         """
+        snapshot = self.schema_snapshot
+        return snapshot.schema_str if snapshot else self.encode_reflected_schema()
+
+    def new_schema_snapshot(self: "One") -> SchemaSnapshot:
+        """
+        A snapshot of the live schema, ignoring any shipped one: what
+        ``agent-app ac-gen`` ships with the MCP runtime.
+        """
+        return SchemaSnapshot(
+            schema_name=self.config.schema_name,
+            warehouse_engine=self.config.warehouse_engine,
+            schema_str=self.encode_reflected_schema(),
+            table_columns=reflect_table_columns(self.reflected_metadata),
+        )
+
+    def encode_reflected_schema(self: "One") -> str:
+        """The live schema, reflected and encoded (about 30 s on a cold Snowflake)."""
         schema_info = new_schema_info(
             engine=self.engine,
             metadata=self.reflected_metadata,
@@ -102,13 +134,16 @@ class DbMixin:
     @cached_property
     def guardrail_policy(self: "One") -> GuardrailPolicy:
         """
-        What the SQL guardrails allow: the reflected tables and columns, plus
-        the dataset's rules in ``data/sql-policy.toml``.
+        What the SQL guardrails allow: the tables and columns (from the shipped
+        snapshot if there is one, else reflected), plus the dataset's rules in
+        ``data/sql-policy.toml``.
         """
+        snapshot = self.schema_snapshot
+        table_columns = snapshot.table_columns if snapshot else reflect_table_columns(self.reflected_metadata)
         return load_policy(
             path_toml=path_enum.path_sql_policy_toml,
             schema_name=self.config.schema_name,
-            table_columns=reflect_table_columns(self.reflected_metadata),
+            table_columns=table_columns,
         )
 
     def execute_sql_query(self: "One", sql: str) -> str:
