@@ -191,9 +191,32 @@ class TestSnowflakeSync:
             return 0
 
         monkeypatch.setattr("agent_app.warehouse.snowflake_sync.settings_from_env", lambda *a: settings)
+        monkeypatch.setattr("agent_app.warehouse.snowflake_sync.admin_private_key_der", lambda: b"der")
         monkeypatch.setattr("agent_app.warehouse.snowflake_sync.run", fake_run)
         with pytest.raises(SystemExit) as exc:
             cli.Cli().snowflake_sync()
         assert exc.value.code == 0
         assert seen["objects"].monitor == "ACME_WH_MONITOR"
         assert seen["path_duckdb"].suffix == ".duckdb"
+
+
+class TestSnowflakeAdminKey:
+    def test_needs_the_admin_user(self, monkeypatch, capsys):
+        monkeypatch.setattr("agent_app.config.get_env", lambda name: None)
+        with pytest.raises(SystemExit) as exc:
+            cli.Cli().snowflake_admin_key()
+        assert exc.value.code == 1
+        assert "SNOWFLAKE_ADMIN_USER" in capsys.readouterr().out
+
+    def test_prints_the_alter_user(self, monkeypatch, capsys, tmp_path):
+        from agent_app.warehouse import snowflake_sync
+
+        monkeypatch.setattr("agent_app.config.get_env", lambda name: "ME")
+        monkeypatch.setattr(snowflake_sync, "DEFAULT_PATH_ADMIN_KEY", tmp_path / "admin.pem")
+        with pytest.raises(SystemExit) as exc:
+            cli.Cli().snowflake_admin_key()
+        assert exc.value.code == 0
+        out = capsys.readouterr().out
+        assert "ALTER USER ME SET RSA_PUBLIC_KEY = 'MII" in out
+        assert "PRIVATE KEY" not in out
+        assert (tmp_path / "admin.pem").is_file()

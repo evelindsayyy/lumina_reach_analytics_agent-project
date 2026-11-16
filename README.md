@@ -49,7 +49,7 @@ Three processes, each with one job, and the same three run locally and on
   the prompt, the guardrails and the reference queries are written once.
   `mise run wh-snowflake-sync` copies the DuckDB file into Snowflake (tables,
   keys, views transpiled by sqlglot, every row count checked). It signs you in
-  through your browser and sets the cost cap: an X-Small warehouse that
+  with a key pair of your own (no password) and sets the cost cap: an X-Small warehouse that
   suspends after 60 idle seconds, a 60-second statement timeout, and a resource
   monitor that suspends the warehouse at its monthly credit quota.
 - **SQL guardrails** (`agent_app/nl2sql/guardrails.py`): every query is parsed

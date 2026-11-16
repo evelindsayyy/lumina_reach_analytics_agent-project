@@ -76,11 +76,18 @@ run = ".venv/bin/agent-app gen-data"
 description = "🔌 Check this machine can reach the configured warehouse (SELECT 1)"
 run = ".venv/bin/agent-app test-db-conn"
 
+[tasks.wh-snowflake-admin-key]
+# Once per machine: your own key pair, so the sync signs in as you without a
+# password. Prints the ALTER USER to paste into a Snowsight worksheet.
+description = "🔑 Create your Snowflake key pair for the sync and print the ALTER USER to run in Snowsight"
+run = ".venv/bin/agent-app snowflake-admin-key"
+
 [tasks.wh-snowflake-sync]
 # The deployed warehouse is a copy of the local DuckDB file, never a second
-# source of truth: rerun this after every `gen-data`. You sign in through your
-# browser; the agent's service user has a key pair and no password.
-description = "❄️ Copy the DuckDB warehouse into Snowflake as you (browser sign-in), with the cost cap (writes to Snowflake)"
+# source of truth: rerun this after every `gen-data`. You sign in with your key
+# pair (wh-snowflake-admin-key); the agent's service user has its own and no
+# password.
+description = "❄️ Copy the DuckDB warehouse into Snowflake as you (key pair), with the cost cap (writes to Snowflake)"
 run = ".venv/bin/agent-app snowflake-sync"
 
 [tasks.cli-print-db-schema]

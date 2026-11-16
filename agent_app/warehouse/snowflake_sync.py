@@ -10,9 +10,12 @@ Copy the local DuckDB warehouse into Snowflake: ``agent-app snowflake-sync``.
 3. The data: Parquet out of DuckDB, ``PUT`` + ``COPY INTO`` each table.
 4. A row count of every table on both sides; any difference fails the sync.
 
-It runs as you, signed in through your browser
-(``authenticator=externalbrowser``): this code never sees a password, and the
-agent's user has none at all.
+It runs as you, with a key pair of your own (``agent-app snowflake-admin-key``
+creates it and prints the one ``ALTER USER`` you paste into a Snowsight
+worksheet). No password is ever typed into, read by or stored by this code,
+and the agent's user has none at all. Browser sign-in
+(``externalbrowser``) is not used: it needs a SAML identity provider, which a
+fresh account does not have.
 """
 
 import dataclasses
@@ -25,6 +28,10 @@ from . import snowflake_ddl as ddl
 #: Where the service user's private key lives unless SNOWFLAKE_PRIVATE_KEY_PATH
 #: says otherwise. ``tmp/`` is git-ignored.
 DEFAULT_PATH_PRIVATE_KEY = path_enum.dir_project_root / "tmp" / "snowflake" / "agent_svc_private_key.pem"
+
+#: Your own (the admin's) private key, used only by the sync. Remove it from
+#: Snowflake with ``ALTER USER <you> UNSET RSA_PUBLIC_KEY`` when you are done.
+DEFAULT_PATH_ADMIN_KEY = path_enum.dir_project_root / "tmp" / "snowflake" / "admin_private_key.pem"
 
 #: The monthly credit cap when SNOWFLAKE_MONTHLY_CREDIT_QUOTA is unset.
 DEFAULT_CREDIT_QUOTA = 2
@@ -79,6 +86,31 @@ def load_or_create_key_pair(path: Path = DEFAULT_PATH_PRIVATE_KEY) -> KeyPair:
     return KeyPair(path, public_key_body(key), created=True)
 
 
+def render_admin_key_sql(admin_user: str, public_key_body: str) -> str:
+    """
+    The statement you run once in Snowsight, signed in as yourself, so the
+    sync can sign in as you with the key pair instead of a password.
+    """
+    return f"ALTER USER {admin_user} SET RSA_PUBLIC_KEY = '{public_key_body}';"
+
+
+def admin_private_key_der(path: Path = DEFAULT_PATH_ADMIN_KEY) -> bytes:
+    """
+    Your private key as the DER bytes the connector takes.
+
+    :raises FileNotFoundError: there is none yet, with the command that makes it.
+    """
+    from .engines import private_key_der
+
+    path = Path(path)
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"No admin key at {path}. Run `mise run wh-snowflake-admin-key` and "
+            f"paste the ALTER USER it prints into a Snowsight worksheet first."
+        )
+    return private_key_der(path.read_text(encoding="utf-8"))
+
+
 def count_differences(expected: dict[str, int], actual: dict[str, int]) -> list[str]:
     """
     One line per table whose row count in Snowflake is not DuckDB's.
@@ -105,12 +137,15 @@ def run(
     import duckdb
     import snowflake.connector
 
+    admin_key = admin_private_key_der()
     keys = load_or_create_key_pair(path_private_key)
     verb = "Created" if keys.created else "Reusing"
     print(f"{verb} the private key of {objects.user}: {keys.path_private_key} (git-ignored)")
 
     source = duckdb.connect(str(path_duckdb), read_only=True)
-    connection = snowflake.connector.connect(account=account, user=admin_user, authenticator="externalbrowser")
+    connection = snowflake.connector.connect(
+        account=account, user=admin_user, authenticator="SNOWFLAKE_JWT", private_key=admin_key
+    )
     try:
         catalog = ddl.read_catalog(source, schema)
         cursor = connection.cursor()

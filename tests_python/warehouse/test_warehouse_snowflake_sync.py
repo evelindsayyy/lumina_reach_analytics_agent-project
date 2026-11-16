@@ -31,6 +31,20 @@ class TestKeyPair:
         assert second.public_key_body == first.public_key_body
 
 
+class TestAdminKey:
+    def test_the_alter_user_sets_the_public_key(self):
+        assert sync.render_admin_key_sql("ME", "MIIBkey") == "ALTER USER ME SET RSA_PUBLIC_KEY = 'MIIBkey';"
+
+    def test_a_missing_admin_key_names_the_command(self, tmp_path):
+        with pytest.raises(FileNotFoundError, match="wh-snowflake-admin-key"):
+            sync.admin_private_key_der(tmp_path / "none.pem")
+
+    def test_an_admin_key_loads_as_der(self, tmp_path):
+        path = tmp_path / "admin.pem"
+        sync.load_or_create_key_pair(path)
+        assert sync.admin_private_key_der(path)[:1] == b"0"  # DER starts with a SEQUENCE
+
+
 class TestCountDifferences:
     def test_equal_counts(self):
         assert sync.count_differences({"a": 2, "b": 3}, {"a": 2, "b": 3}) == []

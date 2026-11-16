@@ -22,6 +22,7 @@ step with it.
     agent-app check-content
     agent-app check-content --retired "patient,bed,ward"
     agent-app test-db-conn
+    agent-app snowflake-admin-key
     agent-app snowflake-sync
     agent-app print-db-schema
 """
@@ -119,10 +120,30 @@ class Cli:
         print(f"OK: the warehouse answered {value}.")
         raise SystemExit(0)
 
+    def snowflake_admin_key(self) -> None:
+        """
+        Create your own key pair for the sync (reused if it exists) and print
+        the ``ALTER USER`` to run once in a Snowsight worksheet. Writes only
+        to ``tmp/snowflake/``; the public key it prints is not a secret.
+        """
+        from agent_app.config import get_env
+        from agent_app.warehouse import snowflake_sync
+
+        admin_user = get_env("SNOWFLAKE_ADMIN_USER")
+        if not admin_user:
+            print("FAILED: set SNOWFLAKE_ADMIN_USER in .env first (see .env.example)")
+            raise SystemExit(1)
+        keys = snowflake_sync.load_or_create_key_pair(snowflake_sync.DEFAULT_PATH_ADMIN_KEY)
+        verb = "Created" if keys.created else "Reusing"
+        print(f"{verb} your private key: {keys.path_private_key} (git-ignored, keep it private)\n")
+        print("Run this once in a Snowsight worksheet, signed in as yourself:\n")
+        print(snowflake_sync.render_admin_key_sql(admin_user, keys.public_key_body))
+        raise SystemExit(0)
+
     def snowflake_sync(self) -> None:
         """
-        Copy the local DuckDB warehouse into Snowflake, signed in as you
-        through your browser (writes to Snowflake).
+        Copy the local DuckDB warehouse into Snowflake, signed in as you with
+        your key pair from ``snowflake-admin-key`` (writes to Snowflake).
 
         Sets up the account first (an X-Small warehouse with a monthly credit
         cap, the read-only role, the key-pair service user), then rebuilds the
@@ -137,6 +158,7 @@ class Cli:
         try:
             settings = snowflake_sync.settings_from_env(one.config, get_env, get_env_int)
             path_duckdb = find_duckdb_file()
+            snowflake_sync.admin_private_key_der()
         except (ValueError, FileNotFoundError, RuntimeError) as e:
             print(f"FAILED: {e}")
             raise SystemExit(1)
