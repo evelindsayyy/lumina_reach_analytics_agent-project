@@ -221,9 +221,3 @@ guardrails rather than any one domain.
 | M2c | deploy on Amazon Bedrock AgentCore: per-runtime IAM roles, Cognito JWT login forwarded from the UI, Snowflake key in SSM readable only by the MCP role, per-user quota | done, live |
 | M2c+ | production polish: build-time schema snapshot (cold start 27 s to 2 s), prompt caching, a $5/month budget with recorded example answers, a search-results UI, responsive charts | done |
 | M2d | evaluation: golden set from Q1–Q20 plus held-out paraphrases, result-level comparison on several seeds | planned |
-
-## Credits
-
-The app skeleton (Next.js chat UI, Strands agent wiring,
-render blocks, content checks) started from a course scaffold,
-`learn_ba_agent_app_scaffold`.
