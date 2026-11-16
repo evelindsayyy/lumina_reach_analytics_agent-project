@@ -1,2 +1,7 @@
 # Files starting with underscore are ignored by Vercel
 # (e.g., api/_index_bkp_v1.py, api/lib/_utils.py)
+
+# The AWS side (CDK app, CodeZip builds) is deployed with `mise run ac-deploy`,
+# never by Vercel, which only serves the web app.
+agentcore/
+build/
