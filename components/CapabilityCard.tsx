@@ -2,18 +2,40 @@
 
 import ConceptTooltip from "@/components/ConceptTooltip"
 import { getIcon } from "@/lib/icons"
+import { highlightSegments } from "@/lib/search-highlight"
 import type { Capability } from "@/lib/site/schema"
 
+/** `Attribution Truth` -> `attribution-truth`, for a result's display path. */
+function slug(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
+}
+
+/** `text` with the words matching `terms` marked, as a results page marks them. */
+function Highlighted({ text, terms }: { text: string; terms: readonly string[] }) {
+  return (
+    <>
+      {highlightSegments(text, terms).map((segment, index) =>
+        segment.match ? (
+          <mark key={index} className="bg-accent text-primary rounded-sm px-0.5 -mx-0.5">
+            {segment.text}
+          </mark>
+        ) : (
+          <span key={index}>{segment.text}</span>
+        ),
+      )}
+    </>
+  )
+}
+
 /**
- * One of the app's four business lines, as a card with an explanation behind it.
+ * One of the app's four business lines, with an explanation behind it.
  *
  * The home page and the agent's welcome screen both show these four, at
  * different sizes. One component rather than two so they cannot drift: the
  * previous arrangement had `home.capabilities` and `chat.insights` as separate
- * config, and they had already drifted -- the second thread was "Portfolio
- * Concentration" on the home page and "Portfolio Health" on the agent, with a
- * different icon, and the tooltip existed on one screen and not the other.
+ * config, and they had already drifted.
  *
+ * Drawn as a search result: a display path, a title in link colour, a snippet.
  * `title` is a concept name and is therefore unreadable to anyone outside the
  * domain. `subtitle` is the one-line translation; the tooltip is the paragraph
  * behind it, on hover, focus, or tap.
@@ -22,6 +44,9 @@ export default function CapabilityCard({
   capability,
   align = "start",
   compact = false,
+  site = "lumina-reach",
+  label,
+  highlight = [],
   className = "",
 }: {
   capability: Capability
@@ -29,6 +54,12 @@ export default function CapabilityCard({
   align?: "start" | "end"
   /** The agent's welcome screen has less room than the home page. */
   compact?: boolean
+  /** The first part of the display path. */
+  site?: string
+  /** A tag before the path, such as "Sponsored" on the first result. */
+  label?: string
+  /** Query terms to mark in the title and snippet. */
+  highlight?: readonly string[]
   className?: string
 }) {
   const Icon = getIcon(capability.icon)
@@ -37,34 +68,35 @@ export default function CapabilityCard({
     <ConceptTooltip
       text={capability.tooltip}
       align={align}
-      className={`group rounded-xl bg-slate-50 border border-slate-200 cursor-help hover:border-brand-soft transition-colors ${
- compact ?"p-4" : "p-5"
-      } ${className}`}
+      className={`group block cursor-help rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-brand-light focus-visible:ring-offset-4 ${className}`}
     >
-      <Icon
-        className={`text-brand ${compact ?"w-5 h-5 mb-2" : "w-6 h-6 mb-3"}`}
-        aria-hidden="true"
-      />
-      <p
-        className={`font-medium text-primary ${
- compact ?"text-sm" : "text-sm"
-        }`}
-      >
-        {capability.title}
-      </p>
-      <p
-        className={`text-slate-500 mt-0.5 leading-snug ${
- compact ?"text-xs" : "text-xs"
-        }`}
-      >
-        {capability.subtitle}
-      </p>
-      {/* The dashed rule is the only thing telling a reader there is something
-          to hover over. Without it the hint is invisible. */}
+      <span className={`flex items-center gap-2 ${compact ? "mb-1" : "mb-1.5"}`}>
+        <span
+          className={`flex items-center justify-center shrink-0 rounded-full bg-surface border border-border ${
+            compact ? "w-5 h-5" : "w-7 h-7"
+          }`}
+        >
+          <Icon className={`text-brand ${compact ? "w-3 h-3" : "w-3.5 h-3.5"}`} aria-hidden="true" />
+        </span>
+        <span className={`min-w-0 truncate font-mono text-path ${compact ? "text-[11px]" : "text-xs sm:text-sm"}`}>
+          {label && <span className="font-body font-semibold text-primary mr-1.5">{label} ·</span>}
+          {site} › {slug(capability.title)}
+        </span>
+      </span>
+      {/* The dashed underline is the only thing telling a reader there is
+          something to hover over. Without it the hint is invisible. */}
       <span
-        aria-hidden="true"
-        className="mt-3 block w-8 border-b border-dashed border-slate-300 group-hover:border-brand-light transition-colors"
-      />
+        className={`block w-fit font-display font-semibold text-brand underline decoration-dashed decoration-brand-soft underline-offset-4 group-hover:decoration-brand transition-colors ${
+          compact ? "text-base leading-snug" : "text-xl sm:text-2xl leading-tight"
+        }`}
+      >
+        <Highlighted text={capability.title} terms={highlight} />
+      </span>
+      <span
+        className={`block text-muted-foreground ${compact ? "mt-1 text-xs leading-snug" : "mt-1.5 text-[15px] leading-relaxed"}`}
+      >
+        <Highlighted text={capability.subtitle} terms={highlight} />
+      </span>
     </ConceptTooltip>
   )
 }

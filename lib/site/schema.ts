@@ -79,6 +79,15 @@ export interface SiteConfig {
     cta: { title: string; subtitle: string }
     /** Labels for the overlay that renders `data/business-context.md`. */
     businessContext: { triggerLabel: string; title: string; subtitle: string }
+    /** Labels around the home page's search box, results and knowledge panel. */
+    search: {
+      placeholder: string
+      suggestionsLabel: string
+      resultsLine: string
+      sponsored: string
+      dataLabel: string
+      stackLabel: string
+    }
   }
   /** The four business lines, shown on both the home page and the agent. */
   capabilities: Capability[]
@@ -127,6 +136,12 @@ export const REQUIRED_SITE_KEYS: readonly string[] = [
   "home.businessContext.triggerLabel",
   "home.businessContext.title",
   "home.businessContext.subtitle",
+  "home.search.placeholder",
+  "home.search.suggestionsLabel",
+  "home.search.resultsLine",
+  "home.search.sponsored",
+  "home.search.dataLabel",
+  "home.search.stackLabel",
   "capabilities",
   "chat.agent",
   "chat.welcomeSubtitle",

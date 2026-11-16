@@ -15,15 +15,15 @@ export const Overview = ({ site }: { site: SiteConfig }) => {
       exit={{ opacity: 0, y: 20 }}
       transition={{ delay: 0.3 }}
     >
-      <div className="border border-slate-200 bg-white rounded-2xl shadow-sm">
-        <div className="py-10 px-8">
+      <div className="border border-border bg-white rounded-2xl">
+        <div className="py-8 px-5 sm:py-10 sm:px-8">
           {/* Header */}
           <div className="flex flex-col items-center text-center mb-8">
-            <h2 className="font-display text-2xl sm:text-3xl text-primary mb-2">
-              <span className="text-brand">{chat.agent}</span>
+            <h2 className="font-display font-bold text-2xl sm:text-3xl text-primary mb-2">
+              {chat.agent}
             </h2>
 
-            <p className="text-slate-500 max-w-md">
+            <p className="text-muted-foreground max-w-md">
               {chat.welcomeSubtitle}
             </p>
           </div>
@@ -31,7 +31,7 @@ export const Overview = ({ site }: { site: SiteConfig }) => {
           {/* The same four business threads the home page shows, from the same
               `[[capabilities]]`. Two arrays here is how the two screens drifted
               apart last time. */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5">
             {capabilities.map((capability, index) => (
               <motion.div
                 key={capability.title}
@@ -50,8 +50,8 @@ export const Overview = ({ site }: { site: SiteConfig }) => {
           </div>
 
           {/* Example prompts */}
-          <div className="mt-6 pt-6 border-t border-slate-100">
-            <p className="text-xs text-slate-400 text-center">
+          <div className="mt-6 pt-6 border-t border-border">
+            <p className="text-xs text-muted-foreground text-center">
               {chat.tryExamples}
             </p>
           </div>

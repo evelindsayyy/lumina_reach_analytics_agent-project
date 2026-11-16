@@ -6,24 +6,20 @@
  * dark palette that used to live here, plus 121 `dark:` variants across the
  * components, could never render and therefore could never be verified. */
 :root {
-  --font-figtree: "Figtree", sans-serif;
-  --font-noto-sans: "Noto Sans", sans-serif;
-  --font-inter: "Inter", sans-serif;
-
   --background: #FFFFFF;
-  --foreground: #0A1628;
+  --foreground: #14171F;
 
   /* shadcn primitives. Only the handful `components/ui/*` and
    * `tailwind.config.ts` actually resolve are kept; the palette this app draws
    * with is `tailwind.config.ts`, not these. */
   --card: 0 0% 100%;
-  --card-foreground: 220 39% 11%;
+  --card-foreground: 225 21% 10%;
   --popover: 0 0% 100%;
-  --popover-foreground: 220 39% 11%;
+  --popover-foreground: 225 21% 10%;
   --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 100%;
-  --input: 214 32% 91%;
-  --ring: 217 91% 60%;
+  --input: 225 12% 90%;
+  --ring: 232 67% 51%;
 }
 
 @layer base {
@@ -36,14 +32,14 @@
   }
 
   body {
-    font-family: var(--font-noto-sans), var(--font-inter), sans-serif;
+    font-family: var(--font-body), sans-serif;
     background-color: var(--background);
     color: var(--foreground);
     @apply antialiased;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: var(--font-figtree), var(--font-inter), sans-serif;
+    font-family: var(--font-display), sans-serif;
     @apply font-semibold tracking-tight;
   }
 }
@@ -55,35 +51,43 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: #F1F5F9;
+  background: #F6F7F9;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #0A1628;
+  background: #C9CDD5;
   border-radius: 5px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #1E3A5F;
+  background: #9EA4B0;
 }
 
 /* ---------------------------------------------------------------------------
  * Chart tokens, read by `components/chat/blocks/chart/`.
  *
- * Values come from the data-viz reference palette. The slot ORDER of the
- * categorical hues is the colorblind-safety mechanism, not a cosmetic choice,
- * so assign them in order and never cycle past the last one.
+ * The data-viz reference palette, re-tuned to the results-page tone: the
+ * surface is the page's own white, the neutrals are the app's ink and greys,
+ * and slot 1 (also the sequential hue) is an indigo next to the link colour.
+ * The slot ORDER of the categorical hues is the colorblind-safety mechanism,
+ * not a cosmetic choice, so assign them in order and never cycle past the last.
+ *
+ * Validated on #ffffff with the dataviz skill's validate_palette.js: lightness,
+ * chroma, adjacent CVD (worst dE 9.1) and normal-vision (22.9) all pass; green
+ * and amber sit below 3:1 on white, so charts keep their legend and table view.
+ * Across ALL pairs, orange vs amber is 13.7 (< 15): true of the reference
+ * palette too, which guarantees all pairs only up to three series.
  * ------------------------------------------------------------------------ */
 .viz-root {
   color-scheme: light;
-  --viz-surface: #fcfcfb;
-  --viz-ink: #0b0b0b;
-  --viz-ink-muted: #898781;
-  --viz-grid: #e1e0d9;
-  --viz-axis: #c3c2b7;
+  --viz-surface: #ffffff;
+  --viz-ink: #14171f;
+  --viz-ink-muted: #6b7180;
+  --viz-grid: #e9ebef;
+  --viz-axis: #c9cdd5;
   /* Single-series bars and lines use one hue (sequential), never one hue per bar. */
-  --viz-seq: #2a78d6;
-  --viz-series-1: #2a78d6;
+  --viz-seq: #3d4fe0;
+  --viz-series-1: #3d4fe0;
   --viz-series-2: #eb6834;
   --viz-series-3: #1baf7a;
   --viz-series-4: #eda100;

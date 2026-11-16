@@ -10,22 +10,18 @@ export default function HomePageContent({
   site: SiteConfig
   businessContext: string
 }) {
-  // The cyan that used to be here came from the personal-portfolio template
-  // this app started as. Nothing else in the design is cyan, and the only place
-  // it still showed was this footer.
+  // A results page ends in a quiet grey footer bar; so does this one.
   return (
-    <div className="min-h-screen bg-white text-primary font-body">
-      <div className="relative">
+    <div className="min-h-screen bg-white text-primary font-body flex flex-col">
+      <div className="flex-1">
         <Hero site={site} businessContext={businessContext} />
-
-        <footer className="py-8 px-4 sm:px-6 lg:px-8 border-t border-slate-200 bg-white">
-          <div className="max-w-7xl mx-auto text-center">
-            <p className="text-sm text-slate-500">
-              &copy; {new Date().getFullYear()} {site.brand.footerName}. All rights reserved.
-            </p>
-          </div>
-        </footer>
       </div>
+
+      <footer className="py-5 px-4 sm:px-6 lg:px-8 border-t border-border bg-surface">
+        <p className="max-w-6xl mx-auto text-sm text-muted-foreground">
+          &copy; {new Date().getFullYear()} {site.brand.footerName}. All rights reserved.
+        </p>
+      </footer>
     </div>
   )
 }

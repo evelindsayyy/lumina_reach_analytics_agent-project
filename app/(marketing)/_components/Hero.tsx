@@ -1,13 +1,22 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useCallback, useState } from "react"
 import Link from "next/link"
 import { ArrowRight, BookOpen } from "lucide-react"
 
 import BusinessContextModal from "@/components/BusinessContextModal"
 import CapabilityCard from "@/components/CapabilityCard"
+import { queryTerms } from "@/lib/search-highlight"
 import type { SiteConfig } from "@/lib/site/schema"
 
+import SearchBox from "./SearchBox"
+
+/**
+ * The home page as a search results page (see the tone note in
+ * tailwind.config.ts): the question goes in the search box, the four business
+ * threads come back as results with the words of the question marked, and the
+ * facts about the product sit in a knowledge panel beside them.
+ */
 export default function Hero({
   site,
   businessContext,
@@ -16,109 +25,109 @@ export default function Hero({
   /** Raw Markdown of `data/business-context.md`, read on the server. */
   businessContext: string
 }) {
-  const [isVisible, setIsVisible] = useState(false)
   const [contextOpen, setContextOpen] = useState(false)
+  const [terms, setTerms] = useState<string[]>([])
+  const onQueryChange = useCallback((query: string) => setTerms(queryTerms(query)), [])
 
-  useEffect(() => {
-    setIsVisible(true)
-  }, [])
-
-  const { home, capabilities } = site
+  const { brand, home, capabilities, chat } = site
+  const domain = `${brand.logoPrefix}${brand.logoAccent}`.toLowerCase()
 
   return (
-    <section className="min-h-screen flex flex-col justify-center pt-24 pb-12 px-4 sm:px-6 lg:px-8 bg-white">
-      <div className="max-w-4xl mx-auto w-full">
-        {/* Title */}
-        <div
-          className={`transition-all duration-700 delay-100 ${isVisible ?"opacity-100 translate-y-0" : "opacity-0 -translate-y-8"}`}
-        >
-          <h1 className="font-display text-5xl sm:text-6xl lg:text-7xl leading-tight mb-4">
-            <span className="text-primary">{home.headline.prefix}</span>
-            <span className="text-brand">{home.headline.accent}</span>
-          </h1>
-
-          <p className="text-xl sm:text-2xl text-slate-500 mb-4">
+    <section className="pt-28 sm:pt-32 pb-20 px-4 sm:px-6 lg:px-8 bg-white">
+      <div className="max-w-6xl mx-auto grid gap-12 lg:gap-16 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="min-w-0 max-w-2xl">
+          <p className="font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground mb-4">
             {home.tagline}
           </p>
+          <h1 className="font-display font-bold text-primary text-[2.6rem] leading-[1.02] sm:text-6xl tracking-tight mb-8">
+            {home.headline.prefix}
+            <mark className="bg-accent text-primary rounded-md px-2 -mx-1 box-decoration-clone">
+              {home.headline.accent}
+            </mark>
+          </h1>
 
-          <div className="w-20 h-1.5 bg-accent rounded mb-10" />
+          <SearchBox
+            placeholder={home.search.placeholder}
+            suggestionsLabel={home.search.suggestionsLabel}
+            submitLabel={home.cta.title}
+            suggestions={chat.suggestedActions}
+            onQueryChange={onQueryChange}
+          />
+
+          <p className="mt-4 mb-10 pl-5 font-mono text-xs text-muted-foreground">{home.search.resultsLine}</p>
+
+          {/* The four business threads, as results. Same four on the agent's
+              welcome screen, from the same `[[capabilities]]`. */}
+          <ol className="space-y-8">
+            {capabilities.map((capability, index) => (
+              <li key={capability.title}>
+                <CapabilityCard
+                  capability={capability}
+                  site={domain}
+                  label={index === 0 ? home.search.sponsored : undefined}
+                  highlight={terms}
+                  className="w-fit max-w-full"
+                />
+              </li>
+            ))}
+          </ol>
         </div>
 
-        {/* Description */}
-        <div
-          className={`transition-all duration-700 delay-300 ${isVisible ?"opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
-        >
-          <p className="text-lg sm:text-xl text-slate-600 mb-5 leading-relaxed max-w-3xl">
-            {home.description}
-          </p>
+        {/* The knowledge panel: what this is, what it reads, what it runs on. */}
+        <aside className="lg:pt-[7.25rem]">
+          <div className="lg:sticky lg:top-24 rounded-2xl border border-border bg-white p-6">
+            <p className="font-display text-2xl font-semibold text-primary">{brand.displayName}</p>
+            <p className="font-mono text-xs text-path mt-1">{home.tagline}</p>
 
-          {/* One paragraph cannot carry a whole business domain; this opens the
-              two or three screens that can. */}
-          <button
-            type="button"
-            onClick={() => setContextOpen(true)}
-            className="group inline-flex items-center gap-2 mb-10 px-4 py-2 rounded-full text-sm font-medium bg-slate-50 text-slate-600 border border-slate-200 hover:border-brand-light hover:text-brand transition-colors cursor-pointer"
-          >
-            <BookOpen className="w-4 h-4" aria-hidden="true" />
-            {home.businessContext.triggerLabel}
-          </button>
+            <p className="mt-4 text-sm leading-relaxed text-primary/80">{home.description}</p>
 
-          {/* The four business threads. Same four on the agent's welcome
-              screen, from the same `[[capabilities]]`. */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
-            {capabilities.map((cap, index) => (
-              <CapabilityCard
-                key={cap.title}
-                capability={cap}
-                // Two columns on a phone: outer cards hang the bubble from
-                // their outer edge so it cannot run off screen.
-                align={index % 2 === 0 ? "start" : "end"}
-                className={`transition-all duration-500 ${isVisible ?"opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}
-              />
-            ))}
-          </div>
+            {/* One paragraph cannot carry a whole business domain; this opens
+                the two or three screens that can. */}
+            <button
+              type="button"
+              onClick={() => setContextOpen(true)}
+              className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-brand hover:underline underline-offset-4 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-light rounded-sm"
+            >
+              <BookOpen className="w-4 h-4" aria-hidden="true" />
+              {home.businessContext.triggerLabel}
+            </button>
 
-          {/* Tech Stack Tags */}
-          <div className="flex flex-wrap gap-2 mb-10">
-            {home.techStack.map((tech) => (
-              <span
-                key={tech}
-                className="px-4 py-1.5 text-sm rounded-full bg-white text-slate-600 border border-slate-200"
-              >
-                {tech}
+            <dl className="mt-5 pt-5 border-t border-border space-y-3 text-sm">
+              <div>
+                <dt className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+                  {home.search.dataLabel}
+                </dt>
+                <dd className="mt-0.5 text-primary/80 leading-relaxed">{home.blurb}</dd>
+              </div>
+              <div>
+                <dt className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+                  {home.search.stackLabel}
+                </dt>
+                <dd className="mt-1 flex flex-wrap gap-1.5">
+                  {home.techStack.map((tech) => (
+                    <span
+                      key={tech}
+                      className="px-2.5 py-0.5 rounded-full bg-surface border border-border text-xs text-primary/80"
+                    >
+                      {tech}
+                    </span>
+                  ))}
+                </dd>
+              </div>
+            </dl>
+
+            <Link
+              href="/chat"
+              className="group mt-6 flex items-center justify-between gap-3 rounded-xl bg-brand px-5 py-4 text-white hover:bg-brand-dark transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-light focus-visible:ring-offset-2"
+            >
+              <span>
+                <span className="block font-display text-lg font-semibold">{home.cta.title}</span>
+                <span className="block text-xs text-white/75">{home.cta.subtitle}</span>
               </span>
-            ))}
+              <ArrowRight className="w-5 h-5 shrink-0 transition-transform group-hover:translate-x-1" aria-hidden="true" />
+            </Link>
           </div>
-        </div>
-
-        {/* CTA Button */}
-        <div
-          className={`transition-all duration-700 delay-500 ${isVisible ?"opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
-        >
-          <Link
-            href="/chat"
-            className="group flex items-center justify-between w-full p-6 bg-white border border-slate-200 rounded-2xl hover:border-brand-light hover:shadow-lg transition-all duration-200 cursor-pointer"
-          >
-            <div>
-              <h3 className="font-display text-2xl sm:text-3xl text-primary mb-1">
-                {home.cta.title}
-              </h3>
-              <p className="text-slate-500 text-sm sm:text-base">
-                {home.cta.subtitle}
-              </p>
-            </div>
-            <div className="flex items-center justify-center w-14 h-14 rounded-full bg-slate-100 group-hover:bg-brand transition-colors">
-              <ArrowRight className="w-6 h-6 text-slate-400 group-hover:text-white group-hover:translate-x-1 transition-all" />
-            </div>
-          </Link>
-        </div>
-
-        {/* Database Info */}
-        <div
-          className={`mt-10 transition-all duration-700 delay-700 ${isVisible ?"opacity-100" : "opacity-0"}`}
-        >
-          <p className="text-sm text-slate-400">{home.blurb}</p>
-        </div>
+        </aside>
       </div>
 
       <BusinessContextModal

@@ -98,6 +98,16 @@ title = "Start Analyzing"
 subtitle = "Ask questions about the paid search portfolio in plain English"
 
 # Labels for the overlay that renders business-context.md.
+# The home page is a search results page (see tailwind.config.ts): these are
+# the labels around the search box and the knowledge panel beside the results.
+[home.search]
+placeholder = "Search the paid search portfolio"
+suggestionsLabel = "Example questions"
+resultsLine = "4 business threads, answered from the Snowflake warehouse"
+sponsored = "Sponsored"
+dataLabel = "Data"
+stackLabel = "Runs on"
+
 [home.businessContext]
 triggerLabel = "What problem does this solve?"
 title = "The business behind the agent"

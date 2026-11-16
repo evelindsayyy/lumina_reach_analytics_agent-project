@@ -66,7 +66,7 @@ export function Chat({ site }: { site: SiteConfig }) {
   }, [messages.length]);
 
   return (
-    <div className="flex flex-col min-w-0 h-[calc(100dvh-64px)] bg-slate-50">
+    <div className="flex flex-col min-w-0 h-[calc(100dvh-64px)] bg-surface">
       <div
         ref={messagesContainerRef}
         className="flex flex-col min-w-0 gap-4 flex-1 overflow-y-scroll pt-4 px-4"
@@ -77,20 +77,20 @@ export function Chat({ site }: { site: SiteConfig }) {
         {/* Context Banner */}
         {messages.length > 0 && isContextBannerVisible && (
           <div className="max-w-3xl mx-auto w-full">
-            <div className="bg-white border border-slate-200 rounded-xl p-4">
+            <div className="bg-white border border-border rounded-2xl p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-start gap-3 flex-1">
                   <AssistantAvatar size="md" />
                   <div className="flex-1">
                     <h3 className="font-display text-sm text-primary">{site.chat.agent}</h3>
-                    <p className="text-xs text-slate-500 mt-1">
+                    <p className="text-xs text-muted-foreground mt-1">
                       {site.chat.messages.welcomeMessage}
                     </p>
                   </div>
                 </div>
                 <button
                   onClick={() => setIsContextBannerVisible(false)}
-                  className="text-slate-400 hover:text-slate-700 transition-colors shrink-0 cursor-pointer"
+                  className="text-muted-foreground hover:text-primary transition-colors shrink-0 cursor-pointer"
                   aria-label="Close"
                 >
                   <X className="w-5 h-5" />
@@ -116,14 +116,14 @@ export function Chat({ site }: { site: SiteConfig }) {
         />
       </div>
 
-      <div className="p-4 bg-white border-t border-slate-200">
+      <div className="p-4 bg-white border-t border-border">
         {mustSignIn && (
-          <div className="mx-auto w-full md:max-w-3xl mb-3 flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+          <div className="mx-auto w-full md:max-w-3xl mb-3 flex items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3 text-sm text-primary/80">
             <span>
               Sign in to ask your own questions (a few live ones per account each month).
               The example questions replay recorded answers from the live agent, no sign-in needed.
             </span>
-            <a href="/api/auth/login" className="shrink-0 font-medium px-4 py-2 bg-brand text-white rounded-lg hover:bg-brand-light transition-colors">
+            <a href="/api/auth/login" className="shrink-0 font-medium px-4 py-2 bg-brand text-white rounded-full hover:bg-brand-dark transition-colors">
               Sign in
             </a>
           </div>

@@ -77,7 +77,7 @@ export default function BusinessContextModal({
         // The backdrop closes on click, so a click that starts inside the panel
         // must not bubble up to it.
         onClick={(event) => event.stopPropagation()}
-        className="relative w-full max-w-3xl max-h-[85vh] flex flex-col rounded-2xl bg-white border border-slate-200 shadow-2xl outline-none"
+        className="relative w-full max-w-3xl max-h-[85vh] flex flex-col rounded-2xl bg-white border border-border shadow-2xl outline-none"
       >
         <button
           type="button"

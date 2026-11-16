@@ -12,15 +12,15 @@ export function AuthStatus({ className = "" }: { className?: string }) {
   if (auth.loading || !auth.enabled) return null
   if (!auth.signedIn) {
     return (
-      <a href="/api/auth/login" className={`font-medium text-sm text-slate-300 hover:text-white transition-colors ${className}`}>
+      <a href="/api/auth/login" className={`font-medium text-sm text-muted-foreground hover:text-primary transition-colors ${className}`}>
         Sign in
       </a>
     )
   }
   return (
     <span className={`flex items-center gap-3 text-sm ${className}`}>
-      {auth.email && <span className="text-slate-400 truncate max-w-[12rem]">{auth.email}</span>}
-      <a href="/api/auth/logout" className="font-medium text-slate-300 hover:text-white transition-colors">
+      {auth.email && <span className="text-muted-foreground truncate max-w-[12rem]">{auth.email}</span>}
+      <a href="/api/auth/logout" className="font-medium text-muted-foreground hover:text-primary transition-colors">
         Sign out
       </a>
     </span>

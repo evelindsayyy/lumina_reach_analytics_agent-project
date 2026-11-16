@@ -44,17 +44,19 @@ export default function Navigation({
   }
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-primary">
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur border-b border-border">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo / Brand */}
           <Link
             href="/"
-            className="flex items-center gap-3 text-white hover:opacity-90 transition-opacity"
+            className="flex items-center gap-3 text-primary hover:opacity-90 transition-opacity"
           >
-            <span className="font-display text-xl font-semibold tracking-tight">
+            {/* The second half carries the highlighter mark a results page
+                puts on a matched word. */}
+            <span className="font-display text-xl font-bold tracking-tight">
               {logoPrefix}
-              <span className="text-accent">{logoAccent}</span>
+              <mark className="ml-0.5 bg-accent text-primary rounded-sm px-1">{logoAccent}</mark>
             </span>
           </Link>
 
@@ -69,7 +71,7 @@ export default function Navigation({
                   <Link
                     key={item.href}
                     href={item.href}
-                    className="font-medium text-sm px-5 py-2 bg-brand text-white rounded-lg hover:bg-brand-light transition-colors cursor-pointer"
+                    className="font-medium text-sm px-5 py-2 bg-brand text-white rounded-full hover:bg-brand-dark transition-colors cursor-pointer"
                   >
                     Start Chat
                   </Link>
@@ -83,8 +85,8 @@ export default function Navigation({
                   className={`
                     font-medium text-sm transition-colors cursor-pointer
                     ${active
-                      ? "text-accent"
-                      : "text-slate-300 hover:text-white"
+                      ? "text-brand underline decoration-2 underline-offset-[22px]"
+                      : "text-muted-foreground hover:text-primary"
                     }
                   `}
                 >
@@ -99,7 +101,7 @@ export default function Navigation({
           <div className="md:hidden">
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="p-2 text-slate-300 hover:text-white transition-colors cursor-pointer"
+              className="p-2 text-muted-foreground hover:text-primary transition-colors cursor-pointer"
               aria-label="Toggle menu"
             >
               {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
@@ -109,7 +111,7 @@ export default function Navigation({
 
         {/* Mobile Navigation Menu */}
         {isMenuOpen && (
-          <div className="md:hidden border-t border-slate-700">
+          <div className="md:hidden border-t border-border">
             <div className="py-4 space-y-2">
               {items.map((item) => {
                 const active = isActive(item.href)
@@ -120,7 +122,7 @@ export default function Navigation({
                     <Link
                       key={item.href}
                       href={item.href}
-                      className="block font-medium text-base py-3 px-4 bg-brand text-white text-center rounded-lg mx-4 cursor-pointer"
+                      className="block font-medium text-base py-3 px-4 bg-brand text-white text-center rounded-full mx-4 cursor-pointer"
                       onClick={() => setIsMenuOpen(false)}
                     >
                       Start Chat
@@ -135,8 +137,8 @@ export default function Navigation({
                     className={`
                       block font-medium text-base py-3 px-4 transition-colors cursor-pointer
                       ${active
-                        ? "text-accent"
-                        : "text-slate-300 hover:text-white"
+                        ? "text-brand"
+                        : "text-muted-foreground hover:text-primary"
                       }
                     `}
                     onClick={() => setIsMenuOpen(false)}

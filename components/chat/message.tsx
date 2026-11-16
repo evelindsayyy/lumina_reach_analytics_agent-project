@@ -20,14 +20,14 @@ const ReasoningBlock = ({ text }: { text: string }) => {
   const previewText = text.length > 100 ? text.slice(0, 100) + "..." : text;
 
   return (
-    <div className="border border-amber-200 rounded-lg bg-amber-50 overflow-hidden">
+    <div className="border border-border rounded-lg bg-surface overflow-hidden">
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full px-3 py-2 flex items-center gap-2 text-left hover:bg-amber-100 transition-colors"
+        className="w-full px-3 py-2 flex items-center gap-2 text-left hover:bg-muted transition-colors"
       >
         <svg
           className={cn(
-            "w-4 h-4 text-amber-600 transition-transform",
+            "w-4 h-4 text-muted-foreground transition-transform",
             isExpanded && "rotate-90"
           )}
           fill="none"
@@ -36,18 +36,18 @@ const ReasoningBlock = ({ text }: { text: string }) => {
         >
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
         </svg>
-        <span className="text-xs font-medium text-amber-700">
+        <span className="font-mono text-xs font-medium text-path">
           Thinking
         </span>
         {!isExpanded && (
-          <span className="text-xs text-amber-600 truncate flex-1">
+          <span className="text-xs text-muted-foreground truncate flex-1">
             {previewText}
           </span>
         )}
       </button>
       {isExpanded && (
-        <div className="px-3 py-2 border-t border-amber-200">
-          <div className="text-xs text-amber-800 whitespace-pre-wrap">
+        <div className="px-3 py-2 border-t border-border">
+          <div className="text-xs text-primary/80 whitespace-pre-wrap">
             {text}
           </div>
         </div>
@@ -80,10 +80,10 @@ export const PreviewMessage = ({
 
         <div
           className={cn(
-            "flex flex-col gap-2 max-w-[85%] sm:max-w-[75%] rounded-xl p-4",
+            "flex flex-col gap-2 max-w-[85%] sm:max-w-[75%] p-4",
             message.role === "user"
-              ? "bg-primary text-white"
-              : "bg-white border border-slate-200"
+              ? "bg-primary text-white rounded-2xl rounded-br-md"
+              : "bg-white border border-border rounded-2xl rounded-bl-md"
           )}
         >
           {/* AI SDK v5: Use parts instead of content */}
@@ -128,8 +128,8 @@ export const PreviewMessage = ({
 
         {/* User Avatar - Right side */}
         {message.role === "user" && (
-          <div className="w-8 h-8 flex items-center justify-center border border-slate-200 shrink-0 rounded-lg bg-slate-100">
-            <User className="w-4 h-4 text-slate-500" aria-label="You" />
+          <div className="w-8 h-8 flex items-center justify-center border border-border shrink-0 rounded-full bg-surface">
+            <User className="w-4 h-4 text-muted-foreground" aria-label="You" />
           </div>
         )}
       </div>
@@ -150,8 +150,8 @@ export const ThinkingMessage = () => {
       <div className="flex gap-3 w-full justify-start">
         <AssistantAvatar />
 
-        <div className="bg-white border border-slate-200 rounded-xl p-4">
-          <div className="flex items-center gap-2 text-slate-600">
+        <div className="bg-white border border-border rounded-2xl rounded-bl-md p-4">
+          <div className="flex items-center gap-2 text-muted-foreground">
             <span className="inline-block w-2 h-2 bg-brand rounded-full animate-pulse" />
             <span className="font-display text-sm">Thinking...</span>
           </div>

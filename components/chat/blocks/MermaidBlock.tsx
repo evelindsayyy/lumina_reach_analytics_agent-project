@@ -24,7 +24,18 @@ function loadMermaid() {
         securityLevel: "strict",
         // The app is light-only, so the diagram is too. It used to read a `dark`
         // class off <html> that nothing ever set.
-        theme: "default",
+        // Coloured to the results-page tone (tailwind.config.ts): indigo-edged
+        // nodes on a pale indigo fill, ink text, grey connectors.
+        theme: "base",
+        themeVariables: {
+          primaryColor: "#EEF0FD",
+          primaryBorderColor: "#2B3FD6",
+          primaryTextColor: "#14171F",
+          secondaryColor: "#FFF6D1",
+          tertiaryColor: "#F6F7F9",
+          lineColor: "#8A909C",
+          fontFamily: "inherit",
+        },
         fontFamily: "inherit",
       })
       return mermaid
@@ -77,7 +88,7 @@ export function MermaidBlock({ source, language }: BlockProps) {
 
   return (
     <div
-      className="my-3 p-4 flex justify-center overflow-x-auto rounded-lg border border-slate-200 bg-white"
+      className="my-3 p-4 flex justify-center overflow-x-auto rounded-lg border border-border bg-white"
       // Safe because of securityLevel: "strict" above.
       dangerouslySetInnerHTML={{ __html: svg }}
     />

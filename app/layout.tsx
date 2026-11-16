@@ -1,20 +1,25 @@
 import type React from "react"
 import type { Metadata, Viewport } from "next"
-import { Inter, Figtree, Noto_Sans } from "next/font/google"
+import { Bricolage_Grotesque, IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google"
 import { generateSEOMetadata } from "@/lib/seo/generateMetadata"
 import { loadSite } from "@/lib/site/load"
 import "./globals.css"
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter" })
-const figtree = Figtree({
+// The three faces of the results-page tone (see tailwind.config.ts).
+const display = Bricolage_Grotesque({
   subsets: ["latin"],
-  variable: "--font-figtree",
-  weight: ["400", "500", "600", "700"]
+  variable: "--font-display",
+  weight: ["500", "600", "700"],
 })
-const notoSans = Noto_Sans({
+const body = IBM_Plex_Sans({
   subsets: ["latin"],
-  variable: "--font-noto-sans",
-  weight: ["400", "500", "700"]
+  variable: "--font-body",
+  weight: ["400", "500", "600"],
+})
+const mono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  variable: "--font-mono",
+  weight: ["400", "500"],
 })
 
 const { seo } = loadSite()
@@ -44,8 +49,8 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className={`${inter.variable} ${figtree.variable} ${notoSans.variable}`}>
-      <body className={`${notoSans.className} antialiased`}>{children}</body>
+    <html lang="en" className={`${display.variable} ${body.variable} ${mono.variable}`}>
+      <body className={`${body.className} antialiased`}>{children}</body>
     </html>
   )
 }

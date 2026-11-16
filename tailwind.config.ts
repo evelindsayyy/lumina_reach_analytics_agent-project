@@ -1,6 +1,23 @@
 import type { Config } from "tailwindcss"
 import tailwindcssAnimate from "tailwindcss-animate"
 
+// Tone: a search results page. The people this is for live in search engines
+// and search term reports, so the app looks like the place their work starts:
+// paper-white, crisp, quiet, with a search box as the front door.
+//
+//   mood        precise
+//   ground      light: white, like a results page, never tinted
+//   colours     ink #14171F for text; link indigo #2B3FD6, the colour of a
+//               result you can click; highlighter yellow #FFE48A, the mark a
+//               search engine puts on the words that matched your query; a
+//               green-teal #1E6E5C for the result's display path
+//   type        Bricolage Grotesque for the few display lines (condensed,
+//               confident, used sparingly); IBM Plex Sans for reading; IBM
+//               Plex Mono for queries, paths and numbers
+//   layout      the home page is a results page: the question goes in the
+//               search box, the four business threads come back as results,
+//               the product facts sit in a knowledge panel beside them
+//
 // This app is light-only: there is no theme toggle, so no `darkMode` strategy
 // and no `dark:` variants anywhere in the tree.
 const config: Config = {
@@ -22,32 +39,35 @@ const config: Config = {
        * Every value below is the exact hex of the Tailwind step it replaced, so
        * introducing these names changed no pixel. */
       colors: {
-        /** Brand navy. Wordmark, headings, dark surfaces, the user bubble. */
+        /** Ink. Headings, body text on white, the user bubble, the wordmark. */
         primary: {
-          DEFAULT: "#0A1628",
+          DEFAULT: "#14171F",
           foreground: "#FFFFFF",
         },
-        /** The action colour: links, the send button, focus rings, hover edges. */
+        /** Link indigo: everything clickable, the send button, focus rings. */
         brand: {
-          DEFAULT: "#2563EB", // was blue-600
-          dark: "#1D4ED8", // was blue-700, hover on a filled surface
-          light: "#3B82F6", // was blue-500, focus rings and hover borders
-          soft: "#60A5FA", // was blue-400
+          DEFAULT: "#2B3FD6",
+          dark: "#1F2FB0", // hover on a filled surface
+          light: "#4A5BE8", // focus rings
+          soft: "#A9B2F5", // hover borders
           foreground: "#FFFFFF",
         },
-        /** Gold. The one non-blue highlight: logo second half, active nav, rules. */
+        /** Highlighter yellow: the words that matched the query. A background,
+         *  never a text colour: it is unreadable as ink on white. */
         accent: {
-          DEFAULT: "#F59E0B", // was amber-500
-          foreground: "#0A1628",
+          DEFAULT: "#FFE48A",
+          foreground: "#14171F",
         },
+        /** A result's display path (lumina-reach › attribution-truth). */
+        path: "#1E6E5C",
         /** Page and card backgrounds. */
         background: "#FFFFFF",
-        foreground: "#0A1628",
-        surface: "#F8FAFC", // slate-50
-        border: "#E2E8F0", // slate-200, what `@apply border-border` resolves to
+        foreground: "#14171F",
+        surface: "#F6F7F9",
+        border: "#E3E5EA", // what `@apply border-border` resolves to
         muted: {
-          DEFAULT: "#F1F5F9", // slate-100
-          foreground: "#64748B", // slate-500
+          DEFAULT: "#EEF0F3",
+          foreground: "#5F6573",
         },
 
         // shadcn/ui primitives. Kept whole because `components/ui/*` and any
@@ -68,10 +88,11 @@ const config: Config = {
         },
       },
       fontFamily: {
-        display: ["var(--font-figtree)", "sans-serif"],
-        body: ["var(--font-noto-sans)", "sans-serif"],
-        heading: ["var(--font-figtree)", "sans-serif"],
-        inter: ["var(--font-inter)", "sans-serif"],
+        display: ["var(--font-display)", "sans-serif"],
+        heading: ["var(--font-display)", "sans-serif"],
+        body: ["var(--font-body)", "sans-serif"],
+        inter: ["var(--font-body)", "sans-serif"],
+        mono: ["var(--font-mono)", "ui-monospace", "monospace"],
       },
       /* Radius is a size ladder, and each step names a role:
        *
